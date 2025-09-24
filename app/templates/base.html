@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}AutoCodeReview{% endblock %}</title>
+    <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/bootstrap-icons.css') }}" rel="stylesheet">
+    <style>
+        .navbar-brand {
+            font-weight: bold;
+        }
+        .card {
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        }
+        .btn-primary {
+            background-color: #0d6efd;
+            border-color: #0d6efd;
+        }
+        .status-pending {
+            color: #ffc107;
+        }
+        .status-completed {
+            color: #198754;
+        }
+        .status-failed {
+            color: #dc3545;
+        }
+        .severity-error {
+            color: #dc3545;
+        }
+        .severity-warning {
+            color: #fd7e14;
+        }
+        .severity-info {
+            color: #0dcaf0;
+        }
+    </style>
+    {% block styles %}{% endblock %}
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="bi bi-code-square"></i>
+                AutoCodeReview
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">首页</a>
+                    </li>
+                    <li class="nav-item" id="navConfigItem" style="display: none;">
+                        <a class="nav-link" href="/profile">配置管理</a>
+                    </li>
+                    <li class="nav-item" id="navAdminItem" style="display: none;">
+                        <a class="nav-link" href="/admin">管理员控制台</a>
+                    </li>
+                </ul>
+                <ul class="navbar-nav">
+                    <li class="nav-item" id="navLoginItem">
+                        <a class="nav-link" href="/login">
+                            <i class="bi bi-box-arrow-in-right"></i>
+                            登录
+                        </a>
+                    </li>
+                    <li class="nav-item" id="navRegisterItem">
+                        <a class="nav-link" href="/register">
+                            <i class="bi bi-person-plus"></i>
+                            注册
+                        </a>
+                    </li>
+                    <li class="nav-item dropdown" id="navUserDropdown" style="display: none;">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-person-circle"></i>
+                            <span id="navUsername">用户</span>
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="/profile">
+                                <i class="bi bi-person"></i> 个人资料
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#" onclick="logout()">
+                                <i class="bi bi-box-arrow-right"></i> 退出登录
+                            </a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container my-4">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="bg-light text-center py-3 mt-5">
+        <div class="container">
+            <p class="text-muted mb-0">
+                &copy; 2025 AutoCodeReview - 自动化代码审查系统
+            </p>
+        </div>
+    </footer>
+
+    <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/axios.min.js') }}"></script>
+
+    <script>
+    // 全局会话管理
+    let currentUser = null;
+
+    // 页面加载时检查登录状态
+    document.addEventListener('DOMContentLoaded', function() {
+        checkLoginStatus();
+    });
+
+    async function checkLoginStatus() {
+        try {
+            const response = await axios.get('/api/check-session');
+            if (response.data.authenticated) {
+                currentUser = response.data.user;
+                showLoggedInNav();
+            } else {
+                showLoggedOutNav();
+            }
+        } catch (error) {
+            console.error('检查登录状态失败:', error);
+            showLoggedOutNav();
+        }
+    }
+
+    function showLoggedInNav() {
+        // 隐藏登录/注册链接
+        document.getElementById('navLoginItem').style.display = 'none';
+        document.getElementById('navRegisterItem').style.display = 'none';
+
+        // 显示用户下拉菜单
+        document.getElementById('navUserDropdown').style.display = 'block';
+        document.getElementById('navUsername').textContent = currentUser.username;
+
+        // 显示配置管理（所有登录用户都可见）
+        document.getElementById('navConfigItem').style.display = 'block';
+
+        // 如果是管理员，显示管理员控制台
+        if (currentUser.role === 'admin') {
+            document.getElementById('navAdminItem').style.display = 'block';
+        }
+    }
+
+    function showLoggedOutNav() {
+        // 显示登录/注册链接
+        document.getElementById('navLoginItem').style.display = 'block';
+        document.getElementById('navRegisterItem').style.display = 'block';
+
+        // 隐藏用户相关菜单
+        document.getElementById('navUserDropdown').style.display = 'none';
+        document.getElementById('navConfigItem').style.display = 'none';
+        document.getElementById('navAdminItem').style.display = 'none';
+    }
+
+    async function logout() {
+        try {
+            await axios.post('/api/logout');
+            currentUser = null;
+            showLoggedOutNav();
+
+            // 如果在需要登录的页面，跳转到首页
+            const protectedPages = ['/config', '/admin', '/profile'];
+            if (protectedPages.some(page => window.location.pathname.startsWith(page))) {
+                window.location.href = '/';
+            }
+
+            // 显示退出成功消息
+            if (typeof showAlert === 'function') {
+                showAlert('success', '已成功退出登录');
+            }
+        } catch (error) {
+            console.error('退出登录失败:', error);
+        }
+    }
+
+    // 权限检查函数
+    function requireLogin() {
+        if (!currentUser) {
+            alert('请先登录');
+            window.location.href = '/login';
+            return false;
+        }
+        return true;
+    }
+
+    function requireAdmin() {
+        if (!currentUser) {
+            alert('请先登录');
+            window.location.href = '/login';
+            return false;
+        }
+        if (currentUser.role !== 'admin') {
+            alert('权限不足，需要管理员权限');
+            return false;
+        }
+        return true;
+    }
+    </script>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

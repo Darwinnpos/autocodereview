@@ -1,0 +1,434 @@
+{% extends "base.html" %}
+
+{% block title %}AutoCodeReview - 配置管理{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-gear"></i>
+                    用户配置
+                </h5>
+            </div>
+            <div class="card-body">
+                <form id="configForm">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="userId" class="form-label">用户ID <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="userId" placeholder="输入唯一用户ID" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="reviewerName" class="form-label">审查者名称</label>
+                                <input type="text" class="form-control" id="reviewerName"
+                                       placeholder="AutoCodeReview" value="AutoCodeReview">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="gitlabUrl" class="form-label">GitLab URL <span class="text-danger">*</span></label>
+                        <input type="url" class="form-control" id="gitlabUrl"
+                               placeholder="https://gitlab.com" required>
+                        <div class="form-text">请输入GitLab实例的URL</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="accessToken" class="form-label">访问令牌 <span class="text-danger">*</span></label>
+                        <input type="password" class="form-control" id="accessToken"
+                               placeholder="glpat-xxxxxxxxxxxxxxxxxxxx" required>
+                        <div class="form-text">
+                            需要具有API访问权限的GitLab个人访问令牌
+                            <a href="https://docs.gitlab.com/ee/user/profile/personal_access_tokens.html" target="_blank">
+                                如何创建？
+                            </a>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <h6>评论设置</h6>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="addLabels" checked>
+                                <label class="form-check-label" for="addLabels">
+                                    添加标签
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="addSignature" checked>
+                                <label class="form-check-label" for="addSignature">
+                                    添加审查者签名
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="addRating" checked>
+                                <label class="form-check-label" for="addRating">
+                                    添加整体评分
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <h6>分析规则</h6>
+                    <div class="row">
+                        <div class="col-md-3">
+                            <h6 class="small">Python</h6>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" id="pythonSyntax" checked>
+                                <label class="form-check-label small" for="pythonSyntax">语法</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" id="pythonSecurity" checked>
+                                <label class="form-check-label small" for="pythonSecurity">安全</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" id="pythonPerformance" checked>
+                                <label class="form-check-label small" for="pythonPerformance">性能</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" id="pythonStyle" checked>
+                                <label class="form-check-label small" for="pythonStyle">风格</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" id="pythonLogic" checked>
+                                <label class="form-check-label small" for="pythonLogic">逻辑</label>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <h6 class="small">JavaScript</h6>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" id="jsSyntax" checked>
+                                <label class="form-check-label small" for="jsSyntax">语法</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" id="jsSecurity" checked>
+                                <label class="form-check-label small" for="jsSecurity">安全</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" id="jsPerformance" checked>
+                                <label class="form-check-label small" for="jsPerformance">性能</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" id="jsStyle" checked>
+                                <label class="form-check-label small" for="jsStyle">风格</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" id="jsLogic" checked>
+                                <label class="form-check-label small" for="jsLogic">逻辑</label>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <h6 class="small">Java</h6>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" id="javaSyntax" checked>
+                                <label class="form-check-label small" for="javaSyntax">语法</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" id="javaSecurity" checked>
+                                <label class="form-check-label small" for="javaSecurity">安全</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" id="javaPerformance" checked>
+                                <label class="form-check-label small" for="javaPerformance">性能</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" id="javaStyle" checked>
+                                <label class="form-check-label small" for="javaStyle">风格</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" id="javaLogic" checked>
+                                <label class="form-check-label small" for="javaLogic">逻辑</label>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <h6 class="small">C++</h6>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" id="cppSyntax" checked>
+                                <label class="form-check-label small" for="cppSyntax">语法</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" id="cppSecurity" checked>
+                                <label class="form-check-label small" for="cppSecurity">安全</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" id="cppPerformance" checked>
+                                <label class="form-check-label small" for="cppPerformance">性能</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" id="cppStyle" checked>
+                                <label class="form-check-label small" for="cppStyle">风格</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" id="cppLogic" checked>
+                                <label class="form-check-label small" for="cppLogic">逻辑</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check"></i>
+                            保存配置
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" id="loadBtn">
+                            <i class="bi bi-download"></i>
+                            加载配置
+                        </button>
+                        <button type="button" class="btn btn-outline-info" id="testBtn">
+                            <i class="bi bi-wifi"></i>
+                            测试连接
+                        </button>
+                        <button type="button" class="btn btn-outline-warning" id="exportBtn">
+                            <i class="bi bi-upload"></i>
+                            导出配置
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-question-circle"></i>
+                    配置说明
+                </h5>
+            </div>
+            <div class="card-body">
+                <h6>必需配置</h6>
+                <ul class="small">
+                    <li><strong>用户ID:</strong> 唯一标识符，用于区分不同用户的配置</li>
+                    <li><strong>GitLab URL:</strong> 您的GitLab实例地址</li>
+                    <li><strong>访问令牌:</strong> 用于访问GitLab API的个人访问令牌</li>
+                </ul>
+
+                <h6 class="mt-3">分析规则</h6>
+                <ul class="small">
+                    <li><strong>语法:</strong> 检查语法错误</li>
+                    <li><strong>安全:</strong> 扫描安全漏洞</li>
+                    <li><strong>性能:</strong> 识别性能问题</li>
+                    <li><strong>风格:</strong> 检查代码风格</li>
+                    <li><strong>逻辑:</strong> 提供逻辑优化建议</li>
+                </ul>
+            </div>
+        </div>
+
+        <div id="statusCard" class="card mt-4" style="display: none;">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-bell"></i>
+                    操作状态
+                </h5>
+            </div>
+            <div class="card-body">
+                <div id="statusContent"></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// 保存配置
+document.getElementById('configForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const statusCard = document.getElementById('statusCard');
+    const statusContent = document.getElementById('statusContent');
+
+    // 收集表单数据
+    const configData = {
+        user_id: document.getElementById('userId').value,
+        gitlab_url: document.getElementById('gitlabUrl').value,
+        access_token: document.getElementById('accessToken').value,
+        reviewer_name: document.getElementById('reviewerName').value,
+        add_labels: document.getElementById('addLabels').checked,
+        add_reviewer_signature: document.getElementById('addSignature').checked,
+        add_overall_rating: document.getElementById('addRating').checked,
+        analysis_rules: {
+            python: {
+                syntax: document.getElementById('pythonSyntax').checked,
+                security: document.getElementById('pythonSecurity').checked,
+                performance: document.getElementById('pythonPerformance').checked,
+                style: document.getElementById('pythonStyle').checked,
+                logic: document.getElementById('pythonLogic').checked
+            },
+            javascript: {
+                syntax: document.getElementById('jsSyntax').checked,
+                security: document.getElementById('jsSecurity').checked,
+                performance: document.getElementById('jsPerformance').checked,
+                style: document.getElementById('jsStyle').checked,
+                logic: document.getElementById('jsLogic').checked
+            },
+            java: {
+                syntax: document.getElementById('javaSyntax').checked,
+                security: document.getElementById('javaSecurity').checked,
+                performance: document.getElementById('javaPerformance').checked,
+                style: document.getElementById('javaStyle').checked,
+                logic: document.getElementById('javaLogic').checked
+            },
+            cpp: {
+                syntax: document.getElementById('cppSyntax').checked,
+                security: document.getElementById('cppSecurity').checked,
+                performance: document.getElementById('cppPerformance').checked,
+                style: document.getElementById('cppStyle').checked,
+                logic: document.getElementById('cppLogic').checked
+            }
+        }
+    };
+
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> 保存中...';
+
+    try {
+        const response = await axios.post('/api/config', configData);
+
+        statusContent.innerHTML = `
+            <div class="alert alert-success">
+                <i class="bi bi-check-circle"></i>
+                配置保存成功！
+            </div>
+        `;
+        statusCard.style.display = 'block';
+    } catch (error) {
+        statusContent.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="bi bi-exclamation-triangle"></i>
+                保存失败: ${error.response?.data?.error || error.message}
+            </div>
+        `;
+        statusCard.style.display = 'block';
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="bi bi-check"></i> 保存配置';
+    }
+});
+
+// 加载配置
+document.getElementById('loadBtn').addEventListener('click', async function() {
+    const userId = document.getElementById('userId').value;
+    if (!userId) {
+        alert('请先输入用户ID');
+        return;
+    }
+
+    const btn = this;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> 加载中...';
+
+    try {
+        const response = await axios.get(`/api/config/${userId}`);
+        const config = response.data.data;
+
+        // 填充表单
+        document.getElementById('reviewerName').value = config.reviewer_name || '';
+        document.getElementById('gitlabUrl').value = config.gitlab_url || '';
+        document.getElementById('addLabels').checked = config.add_labels || false;
+        document.getElementById('addSignature').checked = config.add_reviewer_signature || false;
+        document.getElementById('addRating').checked = config.add_overall_rating || false;
+
+        // 填充分析规则
+        if (config.analysis_rules) {
+            Object.keys(config.analysis_rules).forEach(lang => {
+                Object.keys(config.analysis_rules[lang]).forEach(rule => {
+                    let elementId;
+                    if (lang === 'javascript') {
+                        elementId = `js${rule.charAt(0).toUpperCase() + rule.slice(1)}`;
+                    } else {
+                        elementId = `${lang}${rule.charAt(0).toUpperCase() + rule.slice(1)}`;
+                    }
+                    const element = document.getElementById(elementId);
+                    if (element) {
+                        element.checked = config.analysis_rules[lang][rule];
+                    }
+                });
+            });
+        }
+
+        alert('✅ 配置加载成功');
+    } catch (error) {
+        alert('加载失败: ' + (error.response?.data?.error || error.message));
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-download"></i> 加载配置';
+    }
+});
+
+// 测试连接
+document.getElementById('testBtn').addEventListener('click', async function() {
+    const userId = document.getElementById('userId').value;
+    if (!userId) {
+        alert('请先输入用户ID');
+        return;
+    }
+
+    const btn = this;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> 测试中...';
+
+    try {
+        const response = await axios.post('/api/test-gitlab', {
+            user_id: userId
+        });
+
+        if (response.data.data.connected) {
+            alert('✅ GitLab连接测试成功');
+        } else {
+            alert('❌ 连接失败: ' + response.data.data.error);
+        }
+    } catch (error) {
+        alert('测试失败: ' + (error.response?.data?.error || error.message));
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-wifi"></i> 测试连接';
+    }
+});
+
+// 导出配置
+document.getElementById('exportBtn').addEventListener('click', async function() {
+    const userId = document.getElementById('userId').value;
+    if (!userId) {
+        alert('请先输入用户ID');
+        return;
+    }
+
+    try {
+        const response = await axios.get(`/api/config/${userId}/export?format=json`);
+        const configData = response.data.data.config;
+
+        // 创建下载链接
+        const blob = new Blob([configData], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `config-${userId}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        alert('✅ 配置导出成功');
+    } catch (error) {
+        alert('导出失败: ' + (error.response?.data?.error || error.message));
+    }
+});
+</script>
+{% endblock %}

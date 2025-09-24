@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+
+{% block title %}AutoCodeReview - 注册{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <div class="card shadow">
+            <div class="card-header text-center">
+                <h4 class="card-title mb-0">
+                    <i class="bi bi-person-plus-fill"></i>
+                    用户注册
+                </h4>
+            </div>
+            <div class="card-body">
+                <form id="registerForm">
+                    <div class="mb-3">
+                        <label for="username" class="form-label">用户名 *</label>
+                        <div class="input-group">
+                            <span class="input-group-text">
+                                <i class="bi bi-person"></i>
+                            </span>
+                            <input type="text" class="form-control" id="username"
+                                   placeholder="3-50字符，字母数字下划线" required>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="email" class="form-label">邮箱 *</label>
+                        <div class="input-group">
+                            <span class="input-group-text">
+                                <i class="bi bi-envelope"></i>
+                            </span>
+                            <input type="email" class="form-control" id="email"
+                                   placeholder="your@email.com" required>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="password" class="form-label">密码 *</label>
+                        <div class="input-group">
+                            <span class="input-group-text">
+                                <i class="bi bi-lock"></i>
+                            </span>
+                            <input type="password" class="form-control" id="password"
+                                   placeholder="至少6位字符" required>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="confirmPassword" class="form-label">确认密码 *</label>
+                        <div class="input-group">
+                            <span class="input-group-text">
+                                <i class="bi bi-lock-fill"></i>
+                            </span>
+                            <input type="password" class="form-control" id="confirmPassword"
+                                   placeholder="再次输入密码" required>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>提示：</strong>注册后可在配置管理页面设置GitLab和AI配置
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-person-plus"></i>
+                        立即注册
+                    </button>
+                </form>
+                <hr>
+                <div class="text-center">
+                    <small class="text-muted">
+                        已有账户？
+                        <a href="/login" class="text-decoration-none">立即登录</a>
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="alertContainer"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('registerForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    const username = document.getElementById('username').value.trim();
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+    const confirmPassword = document.getElementById('confirmPassword').value;
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+
+    // 前端验证
+    if (password !== confirmPassword) {
+        showAlert('danger', '两次输入的密码不一致');
+        return;
+    }
+
+    if (password.length < 6) {
+        showAlert('danger', '密码长度至少需要6位');
+        return;
+    }
+
+    // 显示加载状态
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> 注册中...';
+
+    try {
+        const response = await axios.post('/api/register', {
+            username: username,
+            email: email,
+            password: password
+        });
+
+        if (response.data.success) {
+            showAlert('success', '注册成功！正在跳转到登录页面...');
+
+            // 延迟跳转
+            setTimeout(() => {
+                window.location.href = '/login';
+            }, 2000);
+        } else {
+            throw new Error(response.data.error || '注册失败');
+        }
+    } catch (error) {
+        const errorMsg = error.response?.data?.error || error.message;
+        showAlert('danger', errorMsg);
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="bi bi-person-plus"></i> 立即注册';
+    }
+});
+
+function showAlert(type, message) {
+    const alertContainer = document.getElementById('alertContainer');
+    const alertHtml = `
+        <div class="alert alert-${type} alert-dismissible fade show mt-3" role="alert">
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    alertContainer.innerHTML = alertHtml;
+
+    // 自动滚动到提示框
+    alertContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+</script>
+{% endblock %}

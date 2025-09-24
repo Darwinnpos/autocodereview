@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}AutoCodeReview - 登录{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-4">
+        <div class="card shadow">
+            <div class="card-header text-center">
+                <h4 class="card-title mb-0">
+                    <i class="bi bi-person-circle"></i>
+                    用户登录
+                </h4>
+            </div>
+            <div class="card-body">
+                <form id="loginForm">
+                    <div class="mb-3">
+                        <label for="username" class="form-label">用户名</label>
+                        <div class="input-group">
+                            <span class="input-group-text">
+                                <i class="bi bi-person"></i>
+                            </span>
+                            <input type="text" class="form-control" id="username" placeholder="输入用户名" required>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="password" class="form-label">密码</label>
+                        <div class="input-group">
+                            <span class="input-group-text">
+                                <i class="bi bi-lock"></i>
+                            </span>
+                            <input type="password" class="form-control" id="password" placeholder="输入密码" required>
+                        </div>
+                    </div>
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-box-arrow-in-right"></i>
+                            登录
+                        </button>
+                    </div>
+                </form>
+                <hr>
+                <div class="text-center">
+                    <small class="text-muted">
+                        还没有账户？
+                        <a href="/register" class="text-decoration-none">立即注册</a>
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="alertContainer"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('loginForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+
+    // 显示加载状态
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> 登录中...';
+
+    try {
+        const response = await axios.post('/api/login', {
+            username: username,
+            password: password
+        });
+
+        if (response.data.success) {
+            showAlert('success', '登录成功！正在跳转...');
+
+            // 延迟跳转，让用户看到成功消息
+            setTimeout(() => {
+                window.location.href = '/';
+            }, 1000);
+        } else {
+            throw new Error(response.data.error || '登录失败');
+        }
+    } catch (error) {
+        const errorMsg = error.response?.data?.error || error.message;
+        showAlert('danger', errorMsg);
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="bi bi-box-arrow-in-right"></i> 登录';
+    }
+});
+
+function showAlert(type, message) {
+    const alertContainer = document.getElementById('alertContainer');
+    const alertHtml = `
+        <div class="alert alert-${type} alert-dismissible fade show mt-3" role="alert">
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    alertContainer.innerHTML = alertHtml;
+}
+</script>
+{% endblock %}

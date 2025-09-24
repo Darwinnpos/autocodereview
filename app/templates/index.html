@@ -1,0 +1,664 @@
+{% extends "base.html" %}
+
+{% block title %}AutoCodeReview - 首页{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-play-circle"></i>
+                    开始代码审查
+                </h5>
+            </div>
+            <div class="card-body">
+                <form id="reviewForm">
+                    <div class="mb-3">
+                        <label for="mrUrl" class="form-label">GitLab MR URL</label>
+                        <input type="url" class="form-control" id="mrUrl"
+                               placeholder="https://gitlab.com/group/project/-/merge_requests/123" required>
+                        <div class="form-text">请输入完整的GitLab Merge Request URL</div>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-play"></i>
+                            开始审查
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" id="validateBtn">
+                            <i class="bi bi-check-circle"></i>
+                            验证URL
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- 进度显示卡片 -->
+        <div id="progressCard" class="card mt-4" style="display: none;">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-gear"></i>
+                    正在进行代码审查
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-3">
+                    <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                    <span id="progressStatus">准备中...</span>
+                </div>
+
+                <div class="progress mb-3" style="height: 20px;">
+                    <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated"
+                         role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+                        0%
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="small text-muted">
+                            <i class="bi bi-files"></i>
+                            已处理文件: <span id="processedFiles">0</span> / <span id="totalFiles">0</span>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="small text-muted">
+                            <i class="bi bi-bug"></i>
+                            发现问题: <span id="foundIssues">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="currentFileInfo" class="mt-3" style="display: none;">
+                    <div class="small">
+                        <i class="bi bi-file-code"></i>
+                        正在分析: <span id="currentFileName" class="text-primary"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="resultCard" class="card mt-4" style="display: none;">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-file-text"></i>
+                    审查结果
+                </h5>
+            </div>
+            <div class="card-body">
+                <div id="resultContent"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-info-circle"></i>
+                    使用说明
+                </h5>
+            </div>
+            <div class="card-body">
+                <ol>
+                    <li>首先在<a href="/config">配置管理</a>页面设置您的GitLab访问信息</li>
+                    <li>输入您的用户ID（与配置时使用的ID一致）</li>
+                    <li>粘贴GitLab Merge Request的完整URL</li>
+                    <li>点击"开始审查"按钮</li>
+                    <li>系统会自动分析代码并生成待确认的评论</li>
+                    <li>您可以确认后将评论发布到GitLab MR</li>
+                </ol>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-lightbulb"></i>
+                    支持的功能
+                </h5>
+            </div>
+            <div class="card-body">
+                <ul class="list-unstyled">
+                    <li><i class="bi bi-check-circle text-success"></i> 语法错误检测</li>
+                    <li><i class="bi bi-check-circle text-success"></i> 安全漏洞扫描</li>
+                    <li><i class="bi bi-check-circle text-success"></i> 性能问题识别</li>
+                    <li><i class="bi bi-check-circle text-success"></i> 代码风格检查</li>
+                    <li><i class="bi bi-check-circle text-success"></i> 最佳实践建议</li>
+                    <li><i class="bi bi-check-circle text-success"></i> 按行精准评论</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-file-code"></i>
+                    支持的语言
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-3">
+                        <i class="bi bi-file-code display-6 text-primary"></i>
+                        <div class="small">Python</div>
+                    </div>
+                    <div class="col-3">
+                        <i class="bi bi-braces display-6 text-warning"></i>
+                        <div class="small">JavaScript</div>
+                    </div>
+                    <div class="col-3">
+                        <i class="bi bi-code-square display-6 text-danger"></i>
+                        <div class="small">Java</div>
+                    </div>
+                    <div class="col-3">
+                        <i class="bi bi-terminal display-6 text-success"></i>
+                        <div class="small">C++</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Debug version - v1.0.2
+// 全局变量
+let reviewProgressInterval = null;
+
+document.getElementById('reviewForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    const mrUrl = document.getElementById('mrUrl').value;
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const progressCard = document.getElementById('progressCard');
+    const resultCard = document.getElementById('resultCard');
+    const resultContent = document.getElementById('resultContent');
+
+    // 显示加载状态
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> 启动中...';
+
+    // 隐藏结果卡片，显示进度卡片
+    resultCard.style.display = 'none';
+    progressCard.style.display = 'block';
+
+    // 重置进度显示
+    resetProgress();
+
+    try {
+        // 启动审查（异步）
+        const response = await axios.post('/api/review', {
+            mr_url: mrUrl
+        });
+
+        if (response.data.success) {
+            // 异步API返回的数据结构是 {success: true, message: "审查已启动", review_id: 123}
+            console.log('Full API response:', response.data);
+            const reviewId = response.data.review_id;
+            console.log('Starting progress polling for review ID:', reviewId);
+
+            if (reviewId) {
+                // 开始轮询进度
+                startProgressPolling(reviewId);
+            } else {
+                throw new Error('未获取到审查ID');
+            }
+
+        } else {
+            throw new Error(response.data.error || '审查失败');
+        }
+    } catch (error) {
+        // 隐藏进度卡片，显示错误
+        progressCard.style.display = 'none';
+        resultContent.innerHTML = `
+            <div class="alert alert-danger">
+                <h6><i class="bi bi-exclamation-triangle"></i> 审查失败</h6>
+                <p class="mb-0">${error.response?.data?.error || error.message}</p>
+            </div>
+        `;
+        resultCard.style.display = 'block';
+
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="bi bi-play"></i> 开始审查';
+    }
+});
+
+function resetProgress() {
+    document.getElementById('progressStatus').textContent = '准备中...';
+    document.getElementById('progressBar').style.width = '0%';
+    document.getElementById('progressBar').textContent = '0%';
+    document.getElementById('progressBar').setAttribute('aria-valuenow', '0');
+    document.getElementById('processedFiles').textContent = '0';
+    document.getElementById('totalFiles').textContent = '0';
+    document.getElementById('foundIssues').textContent = '0';
+    document.getElementById('currentFileInfo').style.display = 'none';
+}
+
+function startProgressPolling(reviewId) {
+    console.log('Starting progress polling for review:', reviewId);
+    reviewProgressInterval = setInterval(async () => {
+        try {
+            console.log('Polling progress for review:', reviewId);
+            const response = await axios.get(`/api/review/${reviewId}/progress`);
+            console.log('Progress response:', response.data);
+            console.log('Raw progress data:', response.data.data);
+            if (response.data.success) {
+                const progress = response.data.data;
+                console.log('About to update progress with:', progress);
+                updateProgress(progress);
+
+                // 如果审查完成，停止轮询并显示结果
+                if (progress.status === 'completed' || progress.status === 'failed') {
+                    clearInterval(reviewProgressInterval);
+                    showFinalResult(reviewId);
+                }
+            } else {
+                console.error('Progress API returned error:', response.data);
+            }
+        } catch (error) {
+            console.error('获取进度失败:', error);
+        }
+    }, 1000); // 每秒轮询一次
+}
+
+function updateProgress(progress) {
+    console.log('updateProgress called with:', progress);
+    // 更新状态文本
+    const statusTexts = {
+        'preparing': '准备中...',
+        'analyzing': '正在分析代码...',
+        'generating_comments': '正在生成评论...',
+        'saving_results': '正在保存结果...',
+        'completed': '分析完成！',
+        'failed': '分析失败'
+    };
+    const statusText = statusTexts[progress.status] || progress.status;
+    console.log('Setting status text to:', statusText);
+    document.getElementById('progressStatus').textContent = statusText;
+
+    // 更新进度条
+    let percentage = 0;
+    if (progress.status === 'preparing' || progress.total_files === 0) {
+        // 准备阶段显示不确定进度
+        percentage = 0;
+        document.getElementById('progressBar').classList.add('progress-bar-animated');
+    } else {
+        percentage = Math.round((progress.processed_files / Math.max(progress.total_files, 1)) * 100);
+    }
+
+    document.getElementById('progressBar').style.width = percentage + '%';
+    document.getElementById('progressBar').textContent = percentage + '%';
+    document.getElementById('progressBar').setAttribute('aria-valuenow', percentage);
+
+    // 更新文件计数
+    console.log('Updating file counts - processed:', progress.processed_files, 'total:', progress.total_files, 'issues:', progress.total_issues);
+    document.getElementById('processedFiles').textContent = progress.processed_files;
+    if (progress.status === 'preparing' && progress.total_files === 0) {
+        console.log('Using ... for total files (preparing status)');
+        document.getElementById('totalFiles').textContent = '...';
+    } else {
+        console.log('Setting total files to:', progress.total_files);
+        document.getElementById('totalFiles').textContent = progress.total_files;
+    }
+    document.getElementById('foundIssues').textContent = progress.total_issues;
+    console.log('Updated DOM elements');
+
+    // 更新当前文件信息
+    if (progress.current_file && progress.status === 'analyzing') {
+        document.getElementById('currentFileName').textContent = progress.current_file;
+        document.getElementById('currentFileInfo').style.display = 'block';
+    } else {
+        document.getElementById('currentFileInfo').style.display = 'none';
+    }
+
+    // 根据状态调整进度条颜色
+    const progressBar = document.getElementById('progressBar');
+    progressBar.className = 'progress-bar progress-bar-striped progress-bar-animated';
+    if (progress.status === 'completed') {
+        progressBar.classList.add('bg-success');
+    } else if (progress.status === 'failed') {
+        progressBar.classList.add('bg-danger');
+    }
+}
+
+async function showFinalResult(reviewId) {
+    const submitBtn = document.querySelector('button[type="submit"]');
+    const progressCard = document.getElementById('progressCard');
+    const resultCard = document.getElementById('resultCard');
+    const resultContent = document.getElementById('resultContent');
+
+    try {
+        // 获取最终结果
+        const response = await axios.get(`/api/review/${reviewId}/result`);
+        if (response.data.success) {
+            const data = response.data.data;
+
+            // 隐藏进度卡片，显示结果
+            progressCard.style.display = 'none';
+
+            resultContent.innerHTML = `
+                <div class="alert alert-success">
+                    <h6><i class="bi bi-check-circle"></i> 代码分析完成！</h6>
+                    <p class="mb-1">已成功分析 ${data.analysis_summary.total_files_analyzed} 个文件</p>
+                    <p class="mb-1">发现 ${data.analysis_summary.total_issues_found} 个问题</p>
+                    <p class="mb-0">生成了 ${data.pending_comments_count} 条待确认的评论</p>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>问题分布:</h6>
+                        <ul class="list-unstyled">
+                            <li class="severity-error"><i class="bi bi-exclamation-triangle-fill"></i> 错误: ${data.analysis_summary.issues_by_severity.error}</li>
+                            <li class="severity-warning"><i class="bi bi-exclamation-triangle"></i> 警告: ${data.analysis_summary.issues_by_severity.warning}</li>
+                            <li class="severity-info"><i class="bi bi-info-circle"></i> 建议: ${data.analysis_summary.issues_by_severity.info}</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>MR信息:</h6>
+                        <p class="small">
+                            <strong>标题:</strong> ${data.mr_info.title}<br>
+                            <strong>作者:</strong> ${data.mr_info.author}<br>
+                            <strong>分支:</strong> ${data.mr_info.source_branch} → ${data.mr_info.target_branch}
+                        </p>
+                    </div>
+                </div>
+                <div class="d-flex gap-2 mt-3">
+                    <a href="${data.mr_info.web_url}" target="_blank" class="btn btn-primary btn-sm">
+                        <i class="bi bi-arrow-up-right-square"></i>
+                        查看MR
+                    </a>
+                    ${data.pending_comments_count > 0 ? `
+                        <button type="button" class="btn btn-warning btn-sm" onclick="loadPendingComments(${data.review_id})">
+                            <i class="bi bi-chat-dots"></i>
+                            查看待确认评论 (${data.pending_comments_count})
+                        </button>
+                    ` : ''}
+                </div>
+            `;
+            resultCard.style.display = 'block';
+        } else {
+            throw new Error(response.data.error || '获取结果失败');
+        }
+    } catch (error) {
+        progressCard.style.display = 'none';
+        resultContent.innerHTML = `
+            <div class="alert alert-danger">
+                <h6><i class="bi bi-exclamation-triangle"></i> 获取结果失败</h6>
+                <p class="mb-0">${error.response?.data?.error || error.message}</p>
+            </div>
+        `;
+        resultCard.style.display = 'block';
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="bi bi-play"></i> 开始审查';
+    }
+}
+
+document.getElementById('validateBtn').addEventListener('click', async function() {
+    const mrUrl = document.getElementById('mrUrl').value;
+    const btn = this;
+
+    if (!mrUrl) {
+        alert('请输入MR URL');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> 验证中...';
+
+    try {
+        const response = await axios.post('/api/validate-mr-url', {
+            mr_url: mrUrl
+        });
+
+        if (response.data.data.valid) {
+            alert('✅ URL格式正确');
+        } else {
+            alert('❌ ' + response.data.data.error);
+        }
+    } catch (error) {
+        alert('验证失败: ' + (error.response?.data?.error || error.message));
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-check-circle"></i> 验证URL';
+    }
+});
+
+async function loadPendingComments(reviewId) {
+    try {
+        const response = await axios.get(`/api/review/${reviewId}/pending-comments`);
+        if (response.data.success) {
+            showPendingCommentsModal(response.data.data.pending_comments, reviewId);
+        } else {
+            alert('获取待确认评论失败');
+        }
+    } catch (error) {
+        alert('获取待确认评论失败: ' + (error.response?.data?.error || error.message));
+    }
+}
+
+function showPendingCommentsModal(comments, reviewId) {
+    const modalHtml = `
+        <div class="modal fade" id="pendingCommentsModal" tabindex="-1">
+            <div class="modal-dialog modal-xl">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            <i class="bi bi-chat-dots"></i>
+                            待确认评论 (${comments.length} 条)
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div>
+                                <button type="button" class="btn btn-success btn-sm" onclick="selectAllComments()">
+                                    <i class="bi bi-check-all"></i>
+                                    全选
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="clearAllSelections()">
+                                    <i class="bi bi-x-square"></i>
+                                    清空选择
+                                </button>
+                            </div>
+                            <button type="button" class="btn btn-primary" onclick="bulkConfirmComments(${reviewId})">
+                                <i class="bi bi-send"></i>
+                                批量确认选中的评论
+                            </button>
+                        </div>
+                        <div id="commentsContainer">
+                            ${comments.map(comment => `
+                                <div class="card mb-3 comment-card" data-issue-id="${comment.id}">
+                                    <div class="card-header d-flex justify-content-between align-items-center">
+                                        <div class="form-check">
+                                            <input class="form-check-input comment-checkbox" type="checkbox" value="${comment.id}">
+                                            <label class="form-check-label">
+                                                <strong>${comment.file_path}:${comment.line_number}</strong>
+                                                <span class="badge bg-${getSeverityColor(comment.severity)} ms-2">${comment.severity}</span>
+                                                <span class="badge bg-secondary ms-1">${comment.category}</span>
+                                            </label>
+                                        </div>
+                                        <div class="btn-group" role="group">
+                                            <button type="button" class="btn btn-success btn-sm" onclick="confirmSingleComment(${reviewId}, ${comment.id})">
+                                                <i class="bi bi-check"></i>
+                                                确认
+                                            </button>
+                                            <button type="button" class="btn btn-danger btn-sm" onclick="rejectSingleComment(${reviewId}, ${comment.id})">
+                                                <i class="bi bi-x"></i>
+                                                拒绝
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="card-body">
+                                        <p class="mb-2"><strong>问题:</strong> ${comment.message}</p>
+                                        <p class="mb-2"><strong>建议:</strong> ${comment.suggestion || '无'}</p>
+                                        <div class="bg-light p-3 rounded">
+                                            <strong>将要发布的评论:</strong>
+                                            <div class="mt-2">${comment.comment_text.replace(/\n/g, '<br>')}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                        <button type="button" class="btn btn-primary" onclick="bulkConfirmComments(${reviewId})">
+                            <i class="bi bi-send"></i>
+                            确认选中的评论
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // 移除现有的modal如果存在
+    const existingModal = document.getElementById('pendingCommentsModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+
+    // 添加新的modal到页面
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    // 显示modal
+    const modal = new bootstrap.Modal(document.getElementById('pendingCommentsModal'));
+    modal.show();
+}
+
+function getSeverityColor(severity) {
+    switch (severity) {
+        case 'error': return 'danger';
+        case 'warning': return 'warning';
+        case 'info': return 'info';
+        default: return 'secondary';
+    }
+}
+
+function selectAllComments() {
+    document.querySelectorAll('.comment-checkbox').forEach(checkbox => {
+        checkbox.checked = true;
+    });
+}
+
+function clearAllSelections() {
+    document.querySelectorAll('.comment-checkbox').forEach(checkbox => {
+        checkbox.checked = false;
+    });
+}
+
+async function confirmSingleComment(reviewId, issueId) {
+    try {
+        const response = await axios.post(`/api/review/${reviewId}/confirm-comment/${issueId}`);
+        if (response.data.success) {
+            // 移除该评论卡片
+            const card = document.querySelector(`[data-issue-id="${issueId}"]`);
+            if (card) {
+                card.remove();
+            }
+            showToast('success', '评论已确认并发布到GitLab');
+        } else {
+            showToast('error', '确认评论失败');
+        }
+    } catch (error) {
+        showToast('error', '确认评论失败: ' + (error.response?.data?.error || error.message));
+    }
+}
+
+async function rejectSingleComment(reviewId, issueId) {
+    try {
+        const response = await axios.post(`/api/review/${reviewId}/reject-comment/${issueId}`);
+        if (response.data.success) {
+            // 移除该评论卡片
+            const card = document.querySelector(`[data-issue-id="${issueId}"]`);
+            if (card) {
+                card.remove();
+            }
+            showToast('success', '评论已拒绝');
+        } else {
+            showToast('error', '拒绝评论失败');
+        }
+    } catch (error) {
+        showToast('error', '拒绝评论失败: ' + (error.response?.data?.error || error.message));
+    }
+}
+
+async function bulkConfirmComments(reviewId) {
+    const selectedCheckboxes = document.querySelectorAll('.comment-checkbox:checked');
+    const issueIds = Array.from(selectedCheckboxes).map(cb => parseInt(cb.value));
+
+    if (issueIds.length === 0) {
+        alert('请选择要确认的评论');
+        return;
+    }
+
+    try {
+        const response = await axios.post(`/api/review/${reviewId}/bulk-confirm`, {
+            issue_ids: issueIds
+        });
+
+        if (response.data.success) {
+            // 移除已确认的评论卡片
+            issueIds.forEach(issueId => {
+                const card = document.querySelector(`[data-issue-id="${issueId}"]`);
+                if (card) {
+                    card.remove();
+                }
+            });
+            showToast('success', response.data.message);
+
+            // 如果没有更多评论，关闭modal
+            const remainingCards = document.querySelectorAll('.comment-card');
+            if (remainingCards.length === 0) {
+                const modal = bootstrap.Modal.getInstance(document.getElementById('pendingCommentsModal'));
+                modal.hide();
+            }
+        } else {
+            showToast('error', '批量确认失败');
+        }
+    } catch (error) {
+        showToast('error', '批量确认失败: ' + (error.response?.data?.error || error.message));
+    }
+}
+
+function showToast(type, message) {
+    const toastHtml = `
+        <div class="toast align-items-center text-white bg-${type === 'success' ? 'success' : 'danger'} border-0" role="alert">
+            <div class="d-flex">
+                <div class="toast-body">
+                    ${message}
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+            </div>
+        </div>
+    `;
+
+    // 创建toast容器如果不存在
+    let toastContainer = document.getElementById('toast-container');
+    if (!toastContainer) {
+        toastContainer = document.createElement('div');
+        toastContainer.id = 'toast-container';
+        toastContainer.className = 'toast-container position-fixed top-0 end-0 p-3';
+        toastContainer.style.zIndex = '9999';
+        document.body.appendChild(toastContainer);
+    }
+
+    // 添加toast
+    toastContainer.insertAdjacentHTML('beforeend', toastHtml);
+
+    // 显示toast
+    const toastElement = toastContainer.lastElementChild;
+    const toast = new bootstrap.Toast(toastElement);
+    toast.show();
+
+    // 自动移除toast
+    toastElement.addEventListener('hidden.bs.toast', () => {
+        toastElement.remove();
+    });
+}
+</script>
+{% endblock %}

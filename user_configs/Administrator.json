@@ -1,0 +1,55 @@
+{
+  "user_id": "Administrator",
+  "gitlab_url": "http://localhost:8005",
+  "access_token": "glpat-a4uzmMU_hca-jX5srQhuP286MQp1OjEH.01.0w1sydvti",
+  "reviewer_name": "AutoCodeReview",
+  "add_labels": true,
+  "add_reviewer_signature": true,
+  "add_overall_rating": true,
+  "analysis_rules": {
+    "python": {
+      "syntax": true,
+      "security": true,
+      "performance": true,
+      "style": true,
+      "logic": true
+    },
+    "javascript": {
+      "syntax": true,
+      "security": true,
+      "performance": true,
+      "style": true,
+      "logic": true
+    },
+    "java": {
+      "syntax": true,
+      "security": true,
+      "performance": true,
+      "style": true,
+      "logic": true
+    },
+    "cpp": {
+      "syntax": true,
+      "security": true,
+      "performance": true,
+      "style": true,
+      "logic": true
+    }
+  },
+  "custom_templates": [],
+  "add_context": {
+    "severity_levels": [
+      "error",
+      "warning"
+    ],
+    "categories": [
+      "security",
+      "syntax"
+    ]
+  },
+  "notification_settings": {
+    "email_notifications": false
+  },
+  "created_at": "2025-09-23T14:31:23.607942",
+  "updated_at": "2025-09-23T14:31:23.607956"
+}

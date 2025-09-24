@@ -1,0 +1,449 @@
+{% extends "base.html" %}
+
+{% block title %}AutoCodeReview - 管理员控制台{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="h3">
+                <i class="bi bi-gear-fill"></i>
+                管理员控制台
+            </h1>
+            <button type="button" class="btn btn-outline-secondary" onclick="refreshData()">
+                <i class="bi bi-arrow-clockwise"></i>
+                刷新数据
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- 统计信息卡片 -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-white bg-primary">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h5 class="card-title">总用户数</h5>
+                        <h2 id="totalUsers">-</h2>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-people-fill fs-1"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-success">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h5 class="card-title">管理员数</h5>
+                        <h2 id="adminCount">-</h2>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-person-badge-fill fs-1"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-info">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h5 class="card-title">今日活跃</h5>
+                        <h2 id="todayActive">-</h2>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-activity fs-1"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-warning">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h5 class="card-title">本周新增</h5>
+                        <h2 id="newThisWeek">-</h2>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-person-plus-fill fs-1"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 导航标签 -->
+<ul class="nav nav-tabs" id="adminTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="users-tab" data-bs-toggle="tab" data-bs-target="#users"
+                type="button" role="tab" onclick="loadUsers()">
+            <i class="bi bi-people"></i>
+            用户管理
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="reviews-tab" data-bs-toggle="tab" data-bs-target="#reviews"
+                type="button" role="tab" onclick="loadReviews()">
+            <i class="bi bi-file-text"></i>
+            审查记录
+        </button>
+    </li>
+</ul>
+
+<!-- 标签内容 -->
+<div class="tab-content" id="adminTabsContent">
+    <!-- 用户管理 -->
+    <div class="tab-pane fade show active" id="users" role="tabpanel">
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-people"></i>
+                    用户管理
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>用户名</th>
+                                <th>邮箱</th>
+                                <th>角色</th>
+                                <th>GitLab URL</th>
+                                <th>状态</th>
+                                <th>注册时间</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="usersTableBody">
+                            <tr>
+                                <td colspan="8" class="text-center">
+                                    <div class="spinner-border" role="status">
+                                        <span class="visually-hidden">加载中...</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 审查记录 -->
+    <div class="tab-pane fade" id="reviews" role="tabpanel">
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-file-text"></i>
+                    审查记录
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>用户</th>
+                                <th>项目</th>
+                                <th>MR标题</th>
+                                <th>状态</th>
+                                <th>文件数</th>
+                                <th>问题数</th>
+                                <th>创建时间</th>
+                            </tr>
+                        </thead>
+                        <tbody id="reviewsTableBody">
+                            <tr>
+                                <td colspan="8" class="text-center">
+                                    <span class="text-muted">请点击"审查记录"标签加载数据</span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 用户操作模态框 -->
+<div class="modal fade" id="userActionModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="userActionModalTitle">用户操作</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="userActionModalBody">
+                <!-- 动态内容 -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" id="confirmActionBtn">确认</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="alertContainer"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentUsers = [];
+let currentReviews = [];
+
+// 页面加载时初始化
+document.addEventListener('DOMContentLoaded', function() {
+    loadStatistics();
+    loadUsers();
+});
+
+async function loadStatistics() {
+    try {
+        const response = await axios.get('/api/admin/statistics');
+        if (response.data.success) {
+            const stats = response.data.statistics;
+            document.getElementById('totalUsers').textContent = stats.total_users;
+            document.getElementById('adminCount').textContent = stats.admin_count;
+            document.getElementById('todayActive').textContent = stats.today_active;
+            document.getElementById('newThisWeek').textContent = stats.new_this_week;
+        }
+    } catch (error) {
+        console.error('加载统计信息失败:', error);
+    }
+}
+
+async function loadUsers() {
+    try {
+        const response = await axios.get('/api/admin/users?limit=100');
+        if (response.data.success) {
+            currentUsers = response.data.users;
+            renderUsersTable();
+        }
+    } catch (error) {
+        showAlert('danger', '加载用户列表失败: ' + (error.response?.data?.error || error.message));
+        document.getElementById('usersTableBody').innerHTML =
+            '<tr><td colspan="8" class="text-center text-danger">加载失败</td></tr>';
+    }
+}
+
+async function loadReviews() {
+    const tbody = document.getElementById('reviewsTableBody');
+    tbody.innerHTML = '<tr><td colspan="8" class="text-center"><div class="spinner-border" role="status"></div></td></tr>';
+
+    try {
+        const response = await axios.get('/api/admin/reviews?limit=100');
+        if (response.data.success) {
+            currentReviews = response.data.reviews;
+            renderReviewsTable();
+        }
+    } catch (error) {
+        showAlert('danger', '加载审查记录失败: ' + (error.response?.data?.error || error.message));
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-danger">加载失败</td></tr>';
+    }
+}
+
+function renderUsersTable() {
+    const tbody = document.getElementById('usersTableBody');
+
+    if (currentUsers.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">暂无用户</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = currentUsers.map(user => `
+        <tr>
+            <td>${user.id}</td>
+            <td>${user.username}</td>
+            <td>${user.email}</td>
+            <td>
+                <span class="badge bg-${user.role === 'admin' ? 'success' : 'primary'}">
+                    ${user.role === 'admin' ? '管理员' : '用户'}
+                </span>
+            </td>
+            <td>
+                <a href="${user.gitlab_url}" target="_blank" class="text-decoration-none">
+                    ${user.gitlab_url}
+                </a>
+            </td>
+            <td>
+                <span class="badge bg-${user.is_active ? 'success' : 'danger'}">
+                    ${user.is_active ? '激活' : '停用'}
+                </span>
+            </td>
+            <td>${new Date(user.created_at).toLocaleDateString()}</td>
+            <td>
+                <div class="btn-group" role="group">
+                    ${user.is_active ?
+                        `<button type="button" class="btn btn-outline-danger btn-sm"
+                                 onclick="showUserAction(${user.id}, 'deactivate', '${user.username}')">
+                            停用
+                         </button>` :
+                        `<button type="button" class="btn btn-outline-success btn-sm"
+                                 onclick="showUserAction(${user.id}, 'activate', '${user.username}')">
+                            激活
+                         </button>`
+                    }
+                    ${user.role === 'user' ?
+                        `<button type="button" class="btn btn-outline-warning btn-sm"
+                                 onclick="showUserAction(${user.id}, 'make_admin', '${user.username}')">
+                            设为管理员
+                         </button>` :
+                        `<button type="button" class="btn btn-outline-secondary btn-sm"
+                                 onclick="showUserAction(${user.id}, 'make_user', '${user.username}')">
+                            设为普通用户
+                         </button>`
+                    }
+                </div>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function renderReviewsTable() {
+    const tbody = document.getElementById('reviewsTableBody');
+
+    if (currentReviews.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">暂无审查记录</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = currentReviews.map(review => `
+        <tr>
+            <td>${review.id}</td>
+            <td>${review.user_id}</td>
+            <td>${review.project_path}</td>
+            <td>
+                <a href="${review.mr_url}" target="_blank" class="text-decoration-none">
+                    ${review.mr_title}
+                </a>
+            </td>
+            <td>
+                <span class="badge bg-${getStatusColor(review.status)}">
+                    ${getStatusText(review.status)}
+                </span>
+            </td>
+            <td>${review.total_files_analyzed || 0}</td>
+            <td>${review.total_issues_found || 0}</td>
+            <td>${new Date(review.created_at).toLocaleDateString()}</td>
+        </tr>
+    `).join('');
+}
+
+function getStatusColor(status) {
+    switch (status) {
+        case 'completed': return 'success';
+        case 'failed': return 'danger';
+        case 'pending': return 'warning';
+        default: return 'secondary';
+    }
+}
+
+function getStatusText(status) {
+    switch (status) {
+        case 'completed': return '已完成';
+        case 'failed': return '失败';
+        case 'pending': return '进行中';
+        default: return '未知';
+    }
+}
+
+function showUserAction(userId, action, username) {
+    const actionTexts = {
+        'activate': '激活',
+        'deactivate': '停用',
+        'make_admin': '设为管理员',
+        'make_user': '设为普通用户'
+    };
+
+    const actionText = actionTexts[action];
+    document.getElementById('userActionModalTitle').textContent = `${actionText}用户`;
+    document.getElementById('userActionModalBody').innerHTML = `
+        <p>确定要${actionText}用户 <strong>${username}</strong> 吗？</p>
+        ${action === 'deactivate' ? '<p class="text-warning"><small>停用后该用户将无法登录系统</small></p>' : ''}
+        ${action === 'make_admin' ? '<p class="text-info"><small>管理员可以查看所有用户和审查记录</small></p>' : ''}
+    `;
+
+    const confirmBtn = document.getElementById('confirmActionBtn');
+    confirmBtn.onclick = () => performUserAction(userId, action);
+
+    const modal = new bootstrap.Modal(document.getElementById('userActionModal'));
+    modal.show();
+}
+
+async function performUserAction(userId, action) {
+    const confirmBtn = document.getElementById('confirmActionBtn');
+    confirmBtn.disabled = true;
+    confirmBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> 处理中...';
+
+    try {
+        const response = await axios.put(`/api/admin/users/${userId}/status`, {
+            action: action
+        });
+
+        if (response.data.success) {
+            showAlert('success', response.data.message);
+            bootstrap.Modal.getInstance(document.getElementById('userActionModal')).hide();
+            await loadUsers(); // 重新加载用户列表
+            await loadStatistics(); // 更新统计信息
+        } else {
+            throw new Error(response.data.error || '操作失败');
+        }
+    } catch (error) {
+        showAlert('danger', '操作失败: ' + (error.response?.data?.error || error.message));
+    } finally {
+        confirmBtn.disabled = false;
+        confirmBtn.innerHTML = '确认';
+    }
+}
+
+async function refreshData() {
+    await loadStatistics();
+
+    // 根据当前标签刷新对应数据
+    const activeTab = document.querySelector('.nav-link.active').id;
+    if (activeTab === 'users-tab') {
+        await loadUsers();
+    } else if (activeTab === 'reviews-tab') {
+        await loadReviews();
+    }
+
+    showAlert('success', '数据已刷新');
+}
+
+function showAlert(type, message) {
+    const alertContainer = document.getElementById('alertContainer');
+    const alertHtml = `
+        <div class="alert alert-${type} alert-dismissible fade show mt-3" role="alert">
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    alertContainer.innerHTML = alertHtml;
+
+    // 3秒后自动隐藏成功消息
+    if (type === 'success') {
+        setTimeout(() => {
+            const alert = alertContainer.querySelector('.alert');
+            if (alert) {
+                bootstrap.Alert.getInstance(alert)?.close();
+            }
+        }, 3000);
+    }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,877 @@
+{% extends "base.html" %}
+
+{% block title %}AutoCodeReview - 个人资料{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-person-circle"></i>
+                    配置管理
+                </h5>
+            </div>
+            <div class="card-body">
+                <!-- 选项卡导航 -->
+                <ul class="nav nav-tabs" id="profileTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="profile-tab" data-bs-toggle="tab" data-bs-target="#profile-pane" type="button" role="tab">
+                            <i class="bi bi-person"></i> 个人资料
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="gitlab-tab" data-bs-toggle="tab" data-bs-target="#gitlab-pane" type="button" role="tab">
+                            <i class="bi bi-gitlab"></i> GitLab 配置
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="review-tab" data-bs-toggle="tab" data-bs-target="#review-pane" type="button" role="tab">
+                            <i class="bi bi-list-check"></i> 审查配置
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="ai-tab" data-bs-toggle="tab" data-bs-target="#ai-pane" type="button" role="tab">
+                            <i class="bi bi-robot"></i> AI 配置
+                        </button>
+                    </li>
+                </ul>
+
+                <!-- 选项卡内容 -->
+                <div class="tab-content mt-3" id="profileTabContent">
+                    <!-- 个人资料选项卡 -->
+                    <div class="tab-pane fade show active" id="profile-pane" role="tabpanel">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">用户名</label>
+                                    <input type="text" class="form-control" id="username" readonly>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">邮箱</label>
+                                    <input type="email" class="form-control" id="email" readonly>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">角色</label>
+                                    <input type="text" class="form-control" id="role" readonly>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">注册时间</label>
+                                    <input type="text" class="form-control" id="createdAt" readonly>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">最后登录</label>
+                                    <input type="text" class="form-control" id="lastLogin" readonly>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">登录次数</label>
+                                    <input type="text" class="form-control" id="loginCount" readonly>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- GitLab 配置选项卡 -->
+                    <div class="tab-pane fade" id="gitlab-pane" role="tabpanel">
+                        <form id="gitlabForm">
+                            <div class="mb-3">
+                                <label for="gitlabUrl" class="form-label">GitLab URL</label>
+                                <input type="url" class="form-control" id="gitlabUrl"
+                                       placeholder="https://gitlab.com">
+                                <div class="form-text">留空则表示未配置GitLab</div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="accessToken" class="form-label">访问令牌</label>
+                                <input type="password" class="form-control" id="accessToken"
+                                       placeholder="glpat-xxxxxxxxxxxxxxxxxxxx">
+                                <div class="form-text">
+                                    需要包含 <code>api</code>、<code>read_repository</code> 权限。
+                                    <a href="https://docs.gitlab.com/ee/user/profile/personal_access_tokens.html"
+                                       target="_blank" class="text-decoration-none">
+                                        如何创建？
+                                    </a>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="reviewerName" class="form-label">审查者名称</label>
+                                <input type="text" class="form-control" id="reviewerName"
+                                       placeholder="AutoCodeReview">
+                                <div class="form-text">显示在代码评论中的名称</div>
+                            </div>
+
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-outline-secondary" id="testConnectionBtn">
+                                    <i class="bi bi-wifi"></i>
+                                    测试GitLab连接
+                                </button>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-check-lg"></i>
+                                    保存GitLab配置
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- 审查配置选项卡 -->
+                    <div class="tab-pane fade" id="review-pane" role="tabpanel">
+                        <form id="reviewForm">
+                            <div class="mb-4">
+                                <h6 class="mb-3">
+                                    <i class="bi bi-bug"></i>
+                                    代码质量检查
+                                </h6>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" id="checkSyntax" checked>
+                                            <label class="form-check-label" for="checkSyntax">
+                                                语法错误检查
+                                            </label>
+                                            <div class="form-text small">检查代码语法是否正确</div>
+                                        </div>
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" id="checkLogic" checked>
+                                            <label class="form-check-label" for="checkLogic">
+                                                逻辑错误检查
+                                            </label>
+                                            <div class="form-text small">检查代码逻辑是否合理</div>
+                                        </div>
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" id="checkPerformance" checked>
+                                            <label class="form-check-label" for="checkPerformance">
+                                                性能优化建议
+                                            </label>
+                                            <div class="form-text small">提供性能改进建议</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" id="checkSecurity" checked>
+                                            <label class="form-check-label" for="checkSecurity">
+                                                安全漏洞检查
+                                            </label>
+                                            <div class="form-text small">检查潜在的安全问题</div>
+                                        </div>
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" id="checkStyle" checked>
+                                            <label class="form-check-label" for="checkStyle">
+                                                代码风格检查
+                                            </label>
+                                            <div class="form-text small">检查代码格式和命名规范</div>
+                                        </div>
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" id="checkBestPractices" checked>
+                                            <label class="form-check-label" for="checkBestPractices">
+                                                最佳实践建议
+                                            </label>
+                                            <div class="form-text small">提供行业最佳实践建议</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mb-4">
+                                <h6 class="mb-3">
+                                    <i class="bi bi-file-text"></i>
+                                    文档和注释
+                                </h6>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" id="checkComments" checked>
+                                            <label class="form-check-label" for="checkComments">
+                                                注释完整性检查
+                                            </label>
+                                            <div class="form-text small">检查关键代码是否有注释</div>
+                                        </div>
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" id="checkDocumentation">
+                                            <label class="form-check-label" for="checkDocumentation">
+                                                文档建议
+                                            </label>
+                                            <div class="form-text small">提供文档改进建议</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" id="checkReadability">
+                                            <label class="form-check-label" for="checkReadability">
+                                                可读性检查
+                                            </label>
+                                            <div class="form-text small">检查代码可读性和清晰度</div>
+                                        </div>
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" id="checkNaming">
+                                            <label class="form-check-label" for="checkNaming">
+                                                命名规范检查
+                                            </label>
+                                            <div class="form-text small">检查变量和函数命名是否规范</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mb-4">
+                                <h6 class="mb-3">
+                                    <i class="bi bi-shield-check"></i>
+                                    测试和可维护性
+                                </h6>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" id="checkTests">
+                                            <label class="form-check-label" for="checkTests">
+                                                测试覆盖率建议
+                                            </label>
+                                            <div class="form-text small">建议添加测试用例</div>
+                                        </div>
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" id="checkMaintainability">
+                                            <label class="form-check-label" for="checkMaintainability">
+                                                可维护性检查
+                                            </label>
+                                            <div class="form-text small">检查代码的可维护性</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" id="checkComplexity">
+                                            <label class="form-check-label" for="checkComplexity">
+                                                复杂度分析
+                                            </label>
+                                            <div class="form-text small">分析代码复杂度</div>
+                                        </div>
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" id="checkReusability">
+                                            <label class="form-check-label" for="checkReusability">
+                                                代码重用性检查
+                                            </label>
+                                            <div class="form-text small">检查代码重用性和模块化</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="selectAll">
+                                    <label class="form-check-label fw-bold" for="selectAll">
+                                        全选/全不选
+                                    </label>
+                                </div>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-check-lg"></i>
+                                    保存审查配置
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- AI 配置选项卡 -->
+                    <div class="tab-pane fade" id="ai-pane" role="tabpanel">
+                        <form id="aiForm">
+                            <div class="mb-3">
+                                <label for="aiApiUrl" class="form-label">AI API URL</label>
+                                <input type="url" class="form-control" id="aiApiUrl"
+                                       placeholder="https://api.openai.com/v1">
+                                <div class="form-text">支持OpenAI API、Azure OpenAI、或其他兼容的API服务</div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <div class="mb-3">
+                                        <label for="aiApiKey" class="form-label">AI API 密钥</label>
+                                        <input type="password" class="form-control" id="aiApiKey"
+                                               placeholder="sk-xxxxxxxxxxxxxxxxxxxx">
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label for="aiModel" class="form-label">AI 模型</label>
+                                        <div class="input-group">
+                                            <select class="form-select" id="aiModel">
+                                                <option value="">请先探测可用模型</option>
+                                            </select>
+                                            <button type="button" class="btn btn-outline-secondary" id="detectModelsBtn">
+                                                <i class="bi bi-search"></i>
+                                                探测
+                                            </button>
+                                        </div>
+                                        <div class="form-text">
+                                            <small id="modelDetectionStatus" class="text-muted"></small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-outline-info" id="testAiConnectionBtn">
+                                    <i class="bi bi-robot"></i>
+                                    测试AI连接
+                                </button>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-check-lg"></i>
+                                    保存AI配置
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="card-title mb-0">
+                    <i class="bi bi-info-circle"></i>
+                    使用提示
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <h6><i class="bi bi-lightbulb"></i> 配置说明</h6>
+                    <ul class="mb-0 small">
+                        <li>个人资料显示账户基本信息</li>
+                        <li>GitLab配置用于访问代码仓库</li>
+                        <li>AI配置用于生成代码审查意见</li>
+                        <li>所有配置都是可选的，可随时更新</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="alertContainer"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let userProfile = null;
+
+// 页面加载时获取用户资料
+document.addEventListener('DOMContentLoaded', function() {
+    loadUserProfile();
+});
+
+async function loadUserProfile() {
+    try {
+        const response = await axios.get('/api/profile');
+
+        if (response.data.success) {
+            userProfile = response.data.user;
+            populateProfile(userProfile);
+        } else {
+            throw new Error(response.data.error || '获取用户资料失败');
+        }
+    } catch (error) {
+        const errorMsg = error.response?.data?.error || error.message;
+        showAlert('danger', `加载用户资料失败: ${errorMsg}`);
+    }
+}
+
+function populateProfile(user) {
+    // 基本信息（只读）
+    document.getElementById('username').value = user.username || '';
+    document.getElementById('email').value = user.email || '';
+    document.getElementById('role').value = user.role === 'admin' ? '管理员' : '普通用户';
+    document.getElementById('createdAt').value = formatDateTime(user.created_at);
+    document.getElementById('lastLogin').value = formatDateTime(user.last_login);
+    document.getElementById('loginCount').value = user.login_count || 0;
+
+    // 配置信息（可编辑）
+    document.getElementById('gitlabUrl').value = user.gitlab_url || '';
+    document.getElementById('reviewerName').value = user.reviewer_name || '';
+    document.getElementById('aiApiUrl').value = user.ai_api_url || '';
+
+    // AI模型需要特殊处理，如果有保存的模型，需要将其添加到下拉列表
+    const aiModelSelect = document.getElementById('aiModel');
+    if (user.ai_model) {
+        // 如果没有现有选项，添加当前保存的模型
+        let hasCurrentModel = false;
+        for (let i = 0; i < aiModelSelect.options.length; i++) {
+            if (aiModelSelect.options[i].value === user.ai_model) {
+                hasCurrentModel = true;
+                break;
+            }
+        }
+        if (!hasCurrentModel) {
+            const option = document.createElement('option');
+            option.value = user.ai_model;
+            option.textContent = user.ai_model + ' (已保存)';
+            aiModelSelect.appendChild(option);
+        }
+        aiModelSelect.value = user.ai_model;
+    }
+
+    // 审查配置
+    if (user.review_config) {
+        try {
+            const reviewConfig = typeof user.review_config === 'string'
+                ? JSON.parse(user.review_config)
+                : user.review_config;
+
+            // 代码质量检查
+            document.getElementById('checkSyntax').checked = reviewConfig.check_syntax !== false;
+            document.getElementById('checkLogic').checked = reviewConfig.check_logic !== false;
+            document.getElementById('checkPerformance').checked = reviewConfig.check_performance !== false;
+            document.getElementById('checkSecurity').checked = reviewConfig.check_security !== false;
+            document.getElementById('checkStyle').checked = reviewConfig.check_style !== false;
+            document.getElementById('checkBestPractices').checked = reviewConfig.check_best_practices !== false;
+            // 文档和注释
+            document.getElementById('checkComments').checked = reviewConfig.check_comments !== false;
+            document.getElementById('checkDocumentation').checked = reviewConfig.check_documentation || false;
+            document.getElementById('checkReadability').checked = reviewConfig.check_readability || false;
+            document.getElementById('checkNaming').checked = reviewConfig.check_naming || false;
+            // 测试和可维护性
+            document.getElementById('checkTests').checked = reviewConfig.check_tests || false;
+            document.getElementById('checkMaintainability').checked = reviewConfig.check_maintainability || false;
+            document.getElementById('checkComplexity').checked = reviewConfig.check_complexity || false;
+            document.getElementById('checkReusability').checked = reviewConfig.check_reusability || false;
+
+            // 更新全选状态
+            updateSelectAllState();
+        } catch (e) {
+            console.error('解析审查配置失败:', e);
+        }
+    }
+
+    // API密钥和访问令牌显示为已设置或未设置
+    const accessTokenField = document.getElementById('accessToken');
+    const aiApiKeyField = document.getElementById('aiApiKey');
+
+    if (user.access_token) {
+        accessTokenField.placeholder = '已设置 (点击修改)';
+        accessTokenField.value = '';
+    } else {
+        accessTokenField.placeholder = 'glpat-xxxxxxxxxxxxxxxxxxxx';
+        accessTokenField.value = '';
+    }
+
+    if (user.ai_api_key) {
+        aiApiKeyField.placeholder = '已设置 (点击修改)';
+        aiApiKeyField.value = '';
+    } else {
+        aiApiKeyField.placeholder = 'sk-xxxxxxxxxxxxxxxxxxxx';
+        aiApiKeyField.value = '';
+    }
+}
+
+function formatDateTime(dateTimeStr) {
+    if (!dateTimeStr) return '未知';
+    try {
+        return new Date(dateTimeStr).toLocaleString('zh-CN');
+    } catch {
+        return dateTimeStr;
+    }
+}
+
+// 保存GitLab配置表单
+document.getElementById('gitlabForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+
+    // 显示加载状态
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> 保存中...';
+
+    try {
+        const formData = {
+            gitlab_url: document.getElementById('gitlabUrl').value.trim(),
+            access_token: document.getElementById('accessToken').value.trim(),
+            reviewer_name: document.getElementById('reviewerName').value.trim(),
+            ai_api_url: document.getElementById('aiApiUrl').value.trim(),
+            ai_api_key: document.getElementById('aiApiKey').value.trim(),
+            ai_model: document.getElementById('aiModel').value
+        };
+
+        const response = await axios.put('/api/profile', formData);
+
+        if (response.data.success) {
+            showAlert('success', 'GitLab配置保存成功！');
+            // 重新加载用户资料
+            setTimeout(() => {
+                loadUserProfile();
+            }, 1000);
+        } else {
+            throw new Error(response.data.error || '保存失败');
+        }
+    } catch (error) {
+        const errorMsg = error.response?.data?.error || error.message;
+        showAlert('danger', errorMsg);
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+    }
+});
+
+// 保存AI配置表单
+document.getElementById('aiForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+
+    // 显示加载状态
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> 保存中...';
+
+    try {
+        // AI表单只提交AI相关的字段，不影响GitLab配置
+        const formData = {
+            ai_api_url: document.getElementById('aiApiUrl').value.trim(),
+            ai_api_key: document.getElementById('aiApiKey').value.trim(),
+            ai_model: document.getElementById('aiModel').value
+        };
+
+        const response = await axios.put('/api/profile', formData);
+
+        if (response.data.success) {
+            showAlert('success', 'AI配置保存成功！');
+            // 重新加载用户资料
+            setTimeout(() => {
+                loadUserProfile();
+            }, 1000);
+        } else {
+            throw new Error(response.data.error || '保存失败');
+        }
+    } catch (error) {
+        const errorMsg = error.response?.data?.error || error.message;
+        showAlert('danger', errorMsg);
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+    }
+});
+
+// 保存审查配置表单
+document.getElementById('reviewForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+
+    // 显示加载状态
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> 保存中...';
+
+    try {
+        // 收集所有复选框状态
+        const reviewConfig = {
+            // 代码质量检查
+            check_syntax: document.getElementById('checkSyntax').checked,
+            check_logic: document.getElementById('checkLogic').checked,
+            check_performance: document.getElementById('checkPerformance').checked,
+            check_security: document.getElementById('checkSecurity').checked,
+            check_style: document.getElementById('checkStyle').checked,
+            check_best_practices: document.getElementById('checkBestPractices').checked,
+            // 文档和注释
+            check_comments: document.getElementById('checkComments').checked,
+            check_documentation: document.getElementById('checkDocumentation').checked,
+            check_readability: document.getElementById('checkReadability').checked,
+            check_naming: document.getElementById('checkNaming').checked,
+            // 测试和可维护性
+            check_tests: document.getElementById('checkTests').checked,
+            check_maintainability: document.getElementById('checkMaintainability').checked,
+            check_complexity: document.getElementById('checkComplexity').checked,
+            check_reusability: document.getElementById('checkReusability').checked
+        };
+
+        // 审查配置表单只提交审查配置，不影响其他配置
+        const formData = {
+            review_config: JSON.stringify(reviewConfig)
+        };
+
+        const response = await axios.put('/api/profile', formData);
+
+        if (response.data.success) {
+            showAlert('success', '审查配置保存成功！');
+            // 重新加载用户资料
+            setTimeout(() => {
+                loadUserProfile();
+            }, 1000);
+        } else {
+            throw new Error(response.data.error || '保存失败');
+        }
+    } catch (error) {
+        const errorMsg = error.response?.data?.error || error.message;
+        showAlert('danger', errorMsg);
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+    }
+});
+
+// 全选/全不选功能
+document.getElementById('selectAll').addEventListener('change', function() {
+    const isChecked = this.checked;
+    const checkboxes = document.querySelectorAll('#review-pane input[type="checkbox"]:not(#selectAll)');
+
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = isChecked;
+    });
+});
+
+// 监听其他复选框变化，更新全选状态
+document.addEventListener('change', function(e) {
+    if (e.target.type === 'checkbox' && e.target.id !== 'selectAll' && e.target.closest('#review-pane')) {
+        const checkboxes = document.querySelectorAll('#review-pane input[type="checkbox"]:not(#selectAll)');
+        const selectAllCheckbox = document.getElementById('selectAll');
+
+        const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+        const noneChecked = Array.from(checkboxes).every(cb => !cb.checked);
+
+        if (allChecked) {
+            selectAllCheckbox.checked = true;
+            selectAllCheckbox.indeterminate = false;
+        } else if (noneChecked) {
+            selectAllCheckbox.checked = false;
+            selectAllCheckbox.indeterminate = false;
+        } else {
+            selectAllCheckbox.checked = false;
+            selectAllCheckbox.indeterminate = true;
+        }
+    }
+});
+
+// 更新全选状态的辅助函数
+function updateSelectAllState() {
+    const checkboxes = document.querySelectorAll('#review-pane input[type="checkbox"]:not(#selectAll)');
+    const selectAllCheckbox = document.getElementById('selectAll');
+
+    const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+    const noneChecked = Array.from(checkboxes).every(cb => !cb.checked);
+
+    if (allChecked) {
+        selectAllCheckbox.checked = true;
+        selectAllCheckbox.indeterminate = false;
+    } else if (noneChecked) {
+        selectAllCheckbox.checked = false;
+        selectAllCheckbox.indeterminate = false;
+    } else {
+        selectAllCheckbox.checked = false;
+        selectAllCheckbox.indeterminate = true;
+    }
+}
+
+// 探测AI模型
+document.getElementById('detectModelsBtn').addEventListener('click', async function() {
+    const aiApiUrl = document.getElementById('aiApiUrl').value.trim();
+    const aiApiKey = document.getElementById('aiApiKey').value.trim();
+    const btn = this;
+    const statusElement = document.getElementById('modelDetectionStatus');
+    const modelSelect = document.getElementById('aiModel');
+
+    if (!aiApiUrl) {
+        showAlert('warning', '请先填写AI API URL');
+        return;
+    }
+
+    // 检查密钥：如果是"已设置"占位符且userProfile中有密钥，使用保存的密钥
+    let effectiveApiKey = aiApiKey;
+    if ((!aiApiKey || aiApiKey === '已设置') && userProfile && userProfile.ai_api_key && userProfile.ai_api_key !== '已设置') {
+        // 提示用户我们将使用保存的密钥
+        showAlert('info', '使用已保存的API密钥进行模型探测');
+        effectiveApiKey = 'saved'; // 标记使用保存的密钥，后端会处理
+    }
+
+    if (!effectiveApiKey) {
+        showAlert('warning', '请先填写AI API密钥');
+        return;
+    }
+
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span>';
+    statusElement.textContent = '正在探测可用模型...';
+
+    try {
+        // 使用后端API来处理模型探测，这样可以使用保存的密钥
+        const response = await axios.post('/api/detect-models', {
+            ai_api_url: aiApiUrl,
+            ai_api_key: effectiveApiKey === 'saved' ? null : effectiveApiKey, // null表示使用保存的密钥
+            use_saved_key: effectiveApiKey === 'saved'
+        });
+
+        if (response.data.success) {
+            const models = response.data.data.models || [];
+
+            // 清空现有选项
+            modelSelect.innerHTML = '<option value="">请选择模型</option>';
+
+            // 添加探测到的模型
+            models.forEach(model => {
+                const option = document.createElement('option');
+                option.value = model.id;
+                option.textContent = model.id;
+                modelSelect.appendChild(option);
+            });
+
+            // 如果有当前保存的模型，确保它仍然在列表中被选中
+            if (userProfile && userProfile.ai_model) {
+                modelSelect.value = userProfile.ai_model;
+            }
+
+            statusElement.textContent = `探测到 ${models.length} 个可用模型`;
+            statusElement.className = 'text-success';
+            showAlert('success', `成功探测到 ${models.length} 个可用模型`);
+        } else {
+            statusElement.textContent = '模型探测失败';
+            statusElement.className = 'text-danger';
+            showAlert('danger', `模型探测失败: ${response.data.error}`);
+        }
+    } catch (error) {
+        statusElement.textContent = '连接失败';
+        statusElement.className = 'text-danger';
+        const errorMsg = error.response?.data?.error || error.message;
+        showAlert('danger', `连接失败: ${errorMsg}`);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    }
+});
+
+// 测试AI连接
+document.getElementById('testAiConnectionBtn').addEventListener('click', async function() {
+    const aiApiUrl = document.getElementById('aiApiUrl').value.trim();
+    const aiApiKey = document.getElementById('aiApiKey').value.trim();
+    const btn = this;
+
+    if (!aiApiUrl) {
+        showAlert('warning', '请先填写AI API URL');
+        return;
+    }
+
+    // 检查API密钥：如果字段为空且placeholder显示"已设置"，说明之前已保存过配置
+    const aiApiKeyField = document.getElementById('aiApiKey');
+    const hasExistingKey = aiApiKeyField.placeholder.includes('已设置');
+
+    if (!aiApiKey && !hasExistingKey) {
+        showAlert('warning', '请先填写AI API密钥');
+        return;
+    }
+
+    // 如果没有输入新密钥但有已保存的密钥，提示用户
+    if (!aiApiKey && hasExistingKey) {
+        showAlert('info', '将使用已保存的API密钥进行测试');
+        // 这种情况下无法进行前端测试，建议用户重新输入密钥
+        showAlert('warning', '由于安全原因，请重新输入API密钥以进行测试');
+        return;
+    }
+
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> 测试中...';
+
+    try {
+        // 先获取当前选择的模型
+        const selectedModel = document.getElementById('aiModel').value;
+
+        if (!selectedModel) {
+            showAlert('warning', '请先探测并选择一个AI模型');
+            return;
+        }
+
+        // 测试简单的聊天接口
+        const response = await fetch(`${aiApiUrl}/chat/completions`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${aiApiKey}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                model: selectedModel, // 使用用户选择的模型
+                messages: [
+                    { role: 'user', content: 'Hello' }
+                ],
+                max_tokens: 5
+            })
+        });
+
+        if (response.ok) {
+            showAlert('success', 'AI API连接测试成功！');
+        } else {
+            const errorData = await response.json().catch(() => ({}));
+            const errorMessage = errorData.error?.message || `HTTP ${response.status}`;
+            showAlert('danger', `AI连接失败: ${errorMessage}`);
+        }
+    } catch (error) {
+        showAlert('danger', `连接测试失败: ${error.message}`);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    }
+});
+
+// 测试GitLab连接
+document.getElementById('testConnectionBtn').addEventListener('click', async function() {
+    const gitlabUrl = document.getElementById('gitlabUrl').value.trim();
+    const accessToken = document.getElementById('accessToken').value.trim();
+    const btn = this;
+
+    if (!gitlabUrl || !accessToken) {
+        showAlert('warning', '请先填写GitLab URL和访问令牌');
+        return;
+    }
+
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> 测试中...';
+
+    try {
+        const response = await fetch(`${gitlabUrl}/api/v4/user`, {
+            headers: {
+                'Authorization': `Bearer ${accessToken}`
+            }
+        });
+
+        if (response.ok) {
+            showAlert('success', 'GitLab连接测试成功！');
+        } else {
+            showAlert('danger', `GitLab连接失败: ${response.status}`);
+        }
+    } catch (error) {
+        showAlert('danger', `连接测试失败: ${error.message}`);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    }
+});
+
+function showAlert(type, message) {
+    const alertContainer = document.getElementById('alertContainer');
+    const alertHtml = `
+        <div class="alert alert-${type} alert-dismissible fade show mt-3" role="alert">
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    alertContainer.innerHTML = alertHtml;
+
+    // 自动滚动到提示框
+    alertContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+</script>
+{% endblock %}
