@@ -364,6 +364,15 @@ class AuthDatabase:
 
         return [dict(row) for row in rows]
 
+    def get_users_count(self) -> int:
+        """获取用户总数"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute('SELECT COUNT(*) FROM users')
+        count = cursor.fetchone()[0]
+        conn.close()
+        return count
+
     def deactivate_user(self, user_id: int) -> bool:
         """停用用户"""
         conn = sqlite3.connect(self.db_path)
@@ -422,6 +431,66 @@ class AuthDatabase:
         conn.close()
 
         return success
+
+    def remove_user(self, user_id: int) -> bool:
+        """移除用户（软删除或硬删除）"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        # 检查是否是默认管理员账户
+        cursor.execute('SELECT username, email FROM users WHERE id = ?', (user_id,))
+        user_info = cursor.fetchone()
+        if user_info and user_info[0] == 'admin' and user_info[1] == 'admin@autocodereview.com':
+            conn.close()
+            return False  # 不允许删除默认管理员
+
+        # 删除用户记录（硬删除）
+        # 注意：这里不会删除审查记录，只删除用户账户
+        cursor.execute('DELETE FROM users WHERE id = ?', (user_id,))
+        success = cursor.rowcount > 0
+
+        # 清理相关的会话记录
+        cursor.execute('DELETE FROM sessions WHERE user_id = ?', (user_id,))
+
+        conn.commit()
+        conn.close()
+        return success
+
+    def reset_user_password(self, user_id: int, new_password: str) -> bool:
+        """重置用户密码"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        try:
+            # 检查用户是否存在
+            cursor.execute('SELECT id FROM users WHERE id = ?', (user_id,))
+            if not cursor.fetchone():
+                return False
+
+            # 生成新密码哈希
+            password_hash = self._hash_password(new_password)
+
+            # 更新密码
+            cursor.execute('''
+                UPDATE users
+                SET password_hash = ?, updated_at = ?
+                WHERE id = ?
+            ''', (password_hash, datetime.now().isoformat(), user_id))
+
+            success = cursor.rowcount > 0
+
+            # 清理该用户的所有会话，强制重新登录
+            if success:
+                cursor.execute('DELETE FROM sessions WHERE user_id = ?', (user_id,))
+
+            conn.commit()
+            return success
+
+        except Exception as e:
+            logger.error(f"Failed to reset password for user {user_id}: {e}")
+            return False
+        finally:
+            conn.close()
 
     def get_user_statistics(self) -> Dict:
         """获取用户统计信息"""

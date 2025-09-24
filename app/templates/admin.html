@@ -93,7 +93,7 @@
     </li>
     <li class="nav-item" role="presentation">
         <button class="nav-link" id="reviews-tab" data-bs-toggle="tab" data-bs-target="#reviews"
-                type="button" role="tab" onclick="loadReviews()">
+                type="button" role="tab" onclick="loadReviews(); initializeDateRange(); loadReviewStatistics()">
             <i class="bi bi-file-text"></i>
             审查记录
         </button>
@@ -120,8 +120,8 @@
                                 <th>用户名</th>
                                 <th>邮箱</th>
                                 <th>角色</th>
-                                <th>GitLab URL</th>
                                 <th>状态</th>
+                                <th>登录次数</th>
                                 <th>注册时间</th>
                                 <th>操作</th>
                             </tr>
@@ -137,12 +137,120 @@
                         </tbody>
                     </table>
                 </div>
+                <!-- 用户分页控件 -->
+                <div class="card-footer">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="text-muted">
+                            显示第 <span id="usersStartIndex">1</span> - <span id="usersEndIndex">10</span> 条，
+                            共 <span id="usersTotalCount">0</span> 条用户
+                        </div>
+                        <nav>
+                            <ul class="pagination pagination-sm mb-0" id="usersPagination">
+                                <li class="page-item disabled">
+                                    <button class="page-link" onclick="loadUsersPage(usersPagination.currentPage - 1)">
+                                        <i class="bi bi-chevron-left"></i>
+                                    </button>
+                                </li>
+                                <li class="page-item active">
+                                    <button class="page-link">1</button>
+                                </li>
+                                <li class="page-item disabled">
+                                    <button class="page-link" onclick="loadUsersPage(usersPagination.currentPage + 1)">
+                                        <i class="bi bi-chevron-right"></i>
+                                    </button>
+                                </li>
+                            </ul>
+                        </nav>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
     <!-- 审查记录 -->
     <div class="tab-pane fade" id="reviews" role="tabpanel">
+        <!-- 审查统计 -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-graph-up"></i>
+                        审查统计
+                    </h5>
+                    <div class="d-flex gap-2 align-items-center">
+                        <div class="d-flex gap-2">
+                            <input type="date" class="form-control form-control-sm" id="startDate" onchange="loadReviewStatistics()">
+                            <span class="align-self-center">至</span>
+                            <input type="date" class="form-control form-control-sm" id="endDate" onchange="loadReviewStatistics()">
+                        </div>
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button type="button" class="btn btn-outline-secondary" onclick="setQuickDateRange(7)">7天</button>
+                            <button type="button" class="btn btn-outline-secondary active" onclick="setQuickDateRange(30)">30天</button>
+                            <button type="button" class="btn btn-outline-secondary" onclick="setQuickDateRange(90)">90天</button>
+                        </div>
+                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="loadReviewStatistics()">
+                            <i class="bi bi-arrow-clockwise"></i>
+                            刷新
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <!-- 统计卡片 -->
+                <div class="row mb-4">
+                    <div class="col-md-3">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <h3 class="text-primary mb-1" id="totalReviews">-</h3>
+                                <small class="text-muted">总审查数</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <h3 class="text-success mb-1" id="completedReviews">-</h3>
+                                <small class="text-muted">成功完成</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <h3 class="text-warning mb-1" id="totalIssuesFound">-</h3>
+                                <small class="text-muted">发现问题</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <h3 class="text-info mb-1" id="successRate">-</h3>
+                                <small class="text-muted">成功率</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 图表区域 -->
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6 class="mb-3">审查状态分布</h6>
+                        <div class="chart-container" style="position: relative; height: 300px;">
+                            <canvas id="statusChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="mb-3">每日审查趋势</h6>
+                        <div class="chart-container" style="position: relative; height: 300px;">
+                            <canvas id="trendChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 审查记录列表 -->
         <div class="card mt-3">
             <div class="card-header">
                 <h5 class="card-title mb-0">
@@ -173,6 +281,32 @@
                             </tr>
                         </tbody>
                     </table>
+                </div>
+                <!-- 审查记录分页控件 -->
+                <div class="card-footer">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="text-muted">
+                            显示第 <span id="reviewsStartIndex">1</span> - <span id="reviewsEndIndex">10</span> 条，
+                            共 <span id="reviewsTotalCount">0</span> 条记录
+                        </div>
+                        <nav>
+                            <ul class="pagination pagination-sm mb-0" id="reviewsPagination">
+                                <li class="page-item disabled">
+                                    <button class="page-link" onclick="loadReviewsPage(reviewsPagination.currentPage - 1)">
+                                        <i class="bi bi-chevron-left"></i>
+                                    </button>
+                                </li>
+                                <li class="page-item active">
+                                    <button class="page-link">1</button>
+                                </li>
+                                <li class="page-item disabled">
+                                    <button class="page-link" onclick="loadReviewsPage(reviewsPagination.currentPage + 1)">
+                                        <i class="bi bi-chevron-right"></i>
+                                    </button>
+                                </li>
+                            </ul>
+                        </nav>
+                    </div>
                 </div>
             </div>
         </div>
@@ -206,6 +340,21 @@
 let currentUsers = [];
 let currentReviews = [];
 
+// 分页状态
+const usersPagination = {
+    currentPage: 1,
+    pageSize: 10,
+    totalCount: 0,
+    totalPages: 0
+};
+
+const reviewsPagination = {
+    currentPage: 1,
+    pageSize: 10,
+    totalCount: 0,
+    totalPages: 0
+};
+
 // 页面加载时初始化
 document.addEventListener('DOMContentLoaded', function() {
     loadStatistics();
@@ -227,12 +376,19 @@ async function loadStatistics() {
     }
 }
 
-async function loadUsers() {
+async function loadUsers(page = 1) {
     try {
-        const response = await axios.get('/api/admin/users?limit=100');
+        usersPagination.currentPage = page;
+        const offset = (page - 1) * usersPagination.pageSize;
+
+        const response = await axios.get(`/api/admin/users?limit=${usersPagination.pageSize}&offset=${offset}`);
         if (response.data.success) {
             currentUsers = response.data.users;
+            usersPagination.totalCount = response.data.total || currentUsers.length;
+            usersPagination.totalPages = Math.ceil(usersPagination.totalCount / usersPagination.pageSize);
+
             renderUsersTable();
+            renderUsersPagination();
         }
     } catch (error) {
         showAlert('danger', '加载用户列表失败: ' + (error.response?.data?.error || error.message));
@@ -241,19 +397,38 @@ async function loadUsers() {
     }
 }
 
-async function loadReviews() {
+async function loadUsersPage(page) {
+    if (page >= 1 && page <= usersPagination.totalPages) {
+        await loadUsers(page);
+    }
+}
+
+async function loadReviews(page = 1) {
     const tbody = document.getElementById('reviewsTableBody');
     tbody.innerHTML = '<tr><td colspan="8" class="text-center"><div class="spinner-border" role="status"></div></td></tr>';
 
     try {
-        const response = await axios.get('/api/admin/reviews?limit=100');
+        reviewsPagination.currentPage = page;
+        const offset = (page - 1) * reviewsPagination.pageSize;
+
+        const response = await axios.get(`/api/admin/reviews?limit=${reviewsPagination.pageSize}&offset=${offset}`);
         if (response.data.success) {
             currentReviews = response.data.reviews;
+            reviewsPagination.totalCount = response.data.total || currentReviews.length;
+            reviewsPagination.totalPages = Math.ceil(reviewsPagination.totalCount / reviewsPagination.pageSize);
+
             renderReviewsTable();
+            renderReviewsPagination();
         }
     } catch (error) {
         showAlert('danger', '加载审查记录失败: ' + (error.response?.data?.error || error.message));
         tbody.innerHTML = '<tr><td colspan="8" class="text-center text-danger">加载失败</td></tr>';
+    }
+}
+
+async function loadReviewsPage(page) {
+    if (page >= 1 && page <= reviewsPagination.totalPages) {
+        await loadReviews(page);
     }
 }
 
@@ -276,16 +451,12 @@ function renderUsersTable() {
                 </span>
             </td>
             <td>
-                <a href="${user.gitlab_url}" target="_blank" class="text-decoration-none">
-                    ${user.gitlab_url}
-                </a>
-            </td>
-            <td>
                 <span class="badge bg-${user.is_active ? 'success' : 'danger'}">
                     ${user.is_active ? '激活' : '停用'}
                 </span>
             </td>
-            <td>${new Date(user.created_at).toLocaleDateString()}</td>
+            <td>${user.login_count || 0}</td>
+            <td>${new Date(user.created_at).toLocaleString('zh-CN')}</td>
             <td>
                 <div class="btn-group" role="group">
                     ${user.is_active ?
@@ -308,6 +479,14 @@ function renderUsersTable() {
                             设为普通用户
                          </button>`
                     }
+                    <button type="button" class="btn btn-outline-info btn-sm"
+                             onclick="showPasswordReset(${user.id}, '${user.username}')">
+                        重置密码
+                    </button>
+                    <button type="button" class="btn btn-outline-danger btn-sm"
+                             onclick="showUserAction(${user.id}, 'remove', '${user.username}')">
+                        移除
+                    </button>
                 </div>
             </td>
         </tr>
@@ -339,7 +518,7 @@ function renderReviewsTable() {
             </td>
             <td>${review.total_files_analyzed || 0}</td>
             <td>${review.total_issues_found || 0}</td>
-            <td>${new Date(review.created_at).toLocaleDateString()}</td>
+            <td>${new Date(review.created_at).toLocaleString('zh-CN')}</td>
         </tr>
     `).join('');
 }
@@ -362,12 +541,137 @@ function getStatusText(status) {
     }
 }
 
+// 渲染用户分页
+function renderUsersPagination() {
+    const startIndex = (usersPagination.currentPage - 1) * usersPagination.pageSize + 1;
+    const endIndex = Math.min(startIndex + usersPagination.pageSize - 1, usersPagination.totalCount);
+
+    document.getElementById('usersStartIndex').textContent = usersPagination.totalCount > 0 ? startIndex : 0;
+    document.getElementById('usersEndIndex').textContent = endIndex;
+    document.getElementById('usersTotalCount').textContent = usersPagination.totalCount;
+
+    const pagination = document.getElementById('usersPagination');
+    let paginationHTML = '';
+
+    // 上一页按钮
+    const prevDisabled = usersPagination.currentPage <= 1;
+    paginationHTML += `
+        <li class="page-item ${prevDisabled ? 'disabled' : ''}">
+            <button class="page-link" onclick="loadUsersPage(${usersPagination.currentPage - 1})" ${prevDisabled ? 'disabled' : ''}>
+                <i class="bi bi-chevron-left"></i>
+            </button>
+        </li>
+    `;
+
+    // 页码按钮
+    const startPage = Math.max(1, usersPagination.currentPage - 2);
+    const endPage = Math.min(usersPagination.totalPages, usersPagination.currentPage + 2);
+
+    if (startPage > 1) {
+        paginationHTML += `<li class="page-item"><button class="page-link" onclick="loadUsersPage(1)">1</button></li>`;
+        if (startPage > 2) {
+            paginationHTML += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+        }
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+        const active = i === usersPagination.currentPage;
+        paginationHTML += `
+            <li class="page-item ${active ? 'active' : ''}">
+                <button class="page-link" onclick="loadUsersPage(${i})">${i}</button>
+            </li>
+        `;
+    }
+
+    if (endPage < usersPagination.totalPages) {
+        if (endPage < usersPagination.totalPages - 1) {
+            paginationHTML += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+        }
+        paginationHTML += `<li class="page-item"><button class="page-link" onclick="loadUsersPage(${usersPagination.totalPages})">${usersPagination.totalPages}</button></li>`;
+    }
+
+    // 下一页按钮
+    const nextDisabled = usersPagination.currentPage >= usersPagination.totalPages;
+    paginationHTML += `
+        <li class="page-item ${nextDisabled ? 'disabled' : ''}">
+            <button class="page-link" onclick="loadUsersPage(${usersPagination.currentPage + 1})" ${nextDisabled ? 'disabled' : ''}>
+                <i class="bi bi-chevron-right"></i>
+            </button>
+        </li>
+    `;
+
+    pagination.innerHTML = paginationHTML;
+}
+
+// 渲染审查记录分页
+function renderReviewsPagination() {
+    const startIndex = (reviewsPagination.currentPage - 1) * reviewsPagination.pageSize + 1;
+    const endIndex = Math.min(startIndex + reviewsPagination.pageSize - 1, reviewsPagination.totalCount);
+
+    document.getElementById('reviewsStartIndex').textContent = reviewsPagination.totalCount > 0 ? startIndex : 0;
+    document.getElementById('reviewsEndIndex').textContent = endIndex;
+    document.getElementById('reviewsTotalCount').textContent = reviewsPagination.totalCount;
+
+    const pagination = document.getElementById('reviewsPagination');
+    let paginationHTML = '';
+
+    // 上一页按钮
+    const prevDisabled = reviewsPagination.currentPage <= 1;
+    paginationHTML += `
+        <li class="page-item ${prevDisabled ? 'disabled' : ''}">
+            <button class="page-link" onclick="loadReviewsPage(${reviewsPagination.currentPage - 1})" ${prevDisabled ? 'disabled' : ''}>
+                <i class="bi bi-chevron-left"></i>
+            </button>
+        </li>
+    `;
+
+    // 页码按钮
+    const startPage = Math.max(1, reviewsPagination.currentPage - 2);
+    const endPage = Math.min(reviewsPagination.totalPages, reviewsPagination.currentPage + 2);
+
+    if (startPage > 1) {
+        paginationHTML += `<li class="page-item"><button class="page-link" onclick="loadReviewsPage(1)">1</button></li>`;
+        if (startPage > 2) {
+            paginationHTML += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+        }
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+        const active = i === reviewsPagination.currentPage;
+        paginationHTML += `
+            <li class="page-item ${active ? 'active' : ''}">
+                <button class="page-link" onclick="loadReviewsPage(${i})">${i}</button>
+            </li>
+        `;
+    }
+
+    if (endPage < reviewsPagination.totalPages) {
+        if (endPage < reviewsPagination.totalPages - 1) {
+            paginationHTML += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+        }
+        paginationHTML += `<li class="page-item"><button class="page-link" onclick="loadReviewsPage(${reviewsPagination.totalPages})">${reviewsPagination.totalPages}</button></li>`;
+    }
+
+    // 下一页按钮
+    const nextDisabled = reviewsPagination.currentPage >= reviewsPagination.totalPages;
+    paginationHTML += `
+        <li class="page-item ${nextDisabled ? 'disabled' : ''}">
+            <button class="page-link" onclick="loadReviewsPage(${reviewsPagination.currentPage + 1})" ${nextDisabled ? 'disabled' : ''}>
+                <i class="bi bi-chevron-right"></i>
+            </button>
+        </li>
+    `;
+
+    pagination.innerHTML = paginationHTML;
+}
+
 function showUserAction(userId, action, username) {
     const actionTexts = {
         'activate': '激活',
         'deactivate': '停用',
         'make_admin': '设为管理员',
-        'make_user': '设为普通用户'
+        'make_user': '设为普通用户',
+        'remove': '移除'
     };
 
     const actionText = actionTexts[action];
@@ -376,6 +680,7 @@ function showUserAction(userId, action, username) {
         <p>确定要${actionText}用户 <strong>${username}</strong> 吗？</p>
         ${action === 'deactivate' ? '<p class="text-warning"><small>停用后该用户将无法登录系统</small></p>' : ''}
         ${action === 'make_admin' ? '<p class="text-info"><small>管理员可以查看所有用户和审查记录</small></p>' : ''}
+        ${action === 'remove' ? '<p class="text-danger"><small><strong>注意：</strong>此操作将永久删除用户账户，但不会删除其审查记录</small></p>' : ''}
     `;
 
     const confirmBtn = document.getElementById('confirmActionBtn');
@@ -425,6 +730,175 @@ async function refreshData() {
     showAlert('success', '数据已刷新');
 }
 
+// 图表实例
+let statusChart = null;
+let trendChart = null;
+
+// 加载审查统计数据
+async function loadReviewStatistics() {
+    try {
+        const startDate = document.getElementById('startDate').value;
+        const endDate = document.getElementById('endDate').value;
+
+        if (!startDate || !endDate) {
+            showAlert('warning', '请选择开始和结束日期');
+            return;
+        }
+
+        const response = await axios.get(`/api/admin/reviews/statistics?start_date=${startDate}&end_date=${endDate}`);
+
+        if (response.data.success) {
+            const data = response.data.data;
+            renderStatistics(data);
+            renderCharts(data);
+        } else {
+            throw new Error(response.data.error || '加载统计数据失败');
+        }
+    } catch (error) {
+        showAlert('danger', '加载统计数据失败: ' + (error.response?.data?.error || error.message));
+    }
+}
+
+// 设置快速日期范围
+function setQuickDateRange(days) {
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(endDate.getDate() - days);
+
+    document.getElementById('endDate').value = endDate.toISOString().split('T')[0];
+    document.getElementById('startDate').value = startDate.toISOString().split('T')[0];
+
+    // 更新按钮状态
+    document.querySelectorAll('.btn-group .btn').forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+
+    loadReviewStatistics();
+}
+
+// 初始化日期范围（默认30天）
+function initializeDateRange() {
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(endDate.getDate() - 30);
+
+    document.getElementById('endDate').value = endDate.toISOString().split('T')[0];
+    document.getElementById('startDate').value = startDate.toISOString().split('T')[0];
+}
+
+// 渲染统计数据
+function renderStatistics(data) {
+    document.getElementById('totalReviews').textContent = data.total_reviews || 0;
+    document.getElementById('completedReviews').textContent = data.completed_reviews || 0;
+    document.getElementById('totalIssuesFound').textContent = data.total_issues || 0;
+    document.getElementById('successRate').textContent = (data.success_rate || 0) + '%';
+}
+
+// 渲染图表
+function renderCharts(data) {
+    renderStatusChart(data);
+    renderTrendChart(data);
+}
+
+// 渲染状态分布饼图
+function renderStatusChart(data) {
+    const ctx = document.getElementById('statusChart').getContext('2d');
+
+    if (statusChart) {
+        statusChart.destroy();
+        statusChart = null;
+    }
+
+    statusChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['成功完成', '失败', '进行中'],
+            datasets: [{
+                data: [
+                    data.completed_reviews || 0,
+                    data.failed_reviews || 0,
+                    (data.total_reviews || 0) - (data.completed_reviews || 0) - (data.failed_reviews || 0)
+                ],
+                backgroundColor: [
+                    '#198754',
+                    '#dc3545',
+                    '#ffc107'
+                ],
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            },
+            layout: {
+                padding: {
+                    top: 10,
+                    bottom: 10,
+                    left: 10,
+                    right: 10
+                }
+            }
+        }
+    });
+}
+
+// 渲染趋势图
+function renderTrendChart(data) {
+    const ctx = document.getElementById('trendChart').getContext('2d');
+
+    if (trendChart) {
+        trendChart.destroy();
+        trendChart = null;
+    }
+
+    const trendData = data.trend_data || [];
+    const labels = trendData.map(item => {
+        const date = new Date(item.date);
+        return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
+    });
+
+    trendChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: '总审查数',
+                data: trendData.map(item => item.total_count),
+                borderColor: '#0d6efd',
+                backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                tension: 0.4
+            }, {
+                label: '成功完成',
+                data: trendData.map(item => item.completed_count),
+                borderColor: '#198754',
+                backgroundColor: 'rgba(25, 135, 84, 0.1)',
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            }
+        }
+    });
+}
+
 function showAlert(type, message) {
     const alertContainer = document.getElementById('alertContainer');
     const alertHtml = `
@@ -445,5 +919,90 @@ function showAlert(type, message) {
         }, 3000);
     }
 }
+
+// 密码重置相关函数
+function showPasswordReset(userId, username) {
+    document.getElementById('resetPasswordUsername').textContent = username;
+    document.getElementById('newPassword').value = '';
+    document.getElementById('confirmPassword').value = '';
+
+    const confirmBtn = document.getElementById('confirmResetPasswordBtn');
+    confirmBtn.onclick = () => performPasswordReset(userId);
+
+    const modal = new bootstrap.Modal(document.getElementById('passwordResetModal'));
+    modal.show();
+}
+
+async function performPasswordReset(userId) {
+    const newPassword = document.getElementById('newPassword').value.trim();
+    const confirmPassword = document.getElementById('confirmPassword').value.trim();
+
+    // 验证输入
+    if (!newPassword) {
+        showAlert('warning', '请输入新密码');
+        return;
+    }
+
+    if (newPassword.length < 6) {
+        showAlert('warning', '密码长度至少6位');
+        return;
+    }
+
+    if (newPassword !== confirmPassword) {
+        showAlert('warning', '两次输入的密码不一致');
+        return;
+    }
+
+    const confirmBtn = document.getElementById('confirmResetPasswordBtn');
+    confirmBtn.disabled = true;
+    confirmBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> 重置中...';
+
+    try {
+        const response = await axios.put(`/api/admin/users/${userId}/status`, {
+            action: 'reset_password',
+            new_password: newPassword
+        });
+
+        if (response.data.success) {
+            showAlert('success', '密码重置成功，用户需要重新登录');
+            bootstrap.Modal.getInstance(document.getElementById('passwordResetModal')).hide();
+        } else {
+            throw new Error(response.data.error || '重置失败');
+        }
+    } catch (error) {
+        showAlert('danger', '重置密码失败: ' + (error.response?.data?.error || error.message));
+    } finally {
+        confirmBtn.disabled = false;
+        confirmBtn.innerHTML = '重置密码';
+    }
+}
 </script>
+
+<!-- 密码重置模态框 -->
+<div class="modal fade" id="passwordResetModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">重置用户密码</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>为用户 <strong id="resetPasswordUsername"></strong> 设置新密码：</p>
+                <div class="mb-3">
+                    <label for="newPassword" class="form-label">新密码</label>
+                    <input type="password" class="form-control" id="newPassword" placeholder="请输入新密码" minlength="6">
+                    <div class="form-text">密码长度至少6位</div>
+                </div>
+                <div class="mb-3">
+                    <label for="confirmPassword" class="form-label">确认密码</label>
+                    <input type="password" class="form-control" id="confirmPassword" placeholder="再次输入新密码">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" id="confirmResetPasswordBtn">重置密码</button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}

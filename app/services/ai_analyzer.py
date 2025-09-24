@@ -54,9 +54,30 @@ class AICodeAnalyzer:
 
             return issues
 
+        except requests.exceptions.Timeout as e:
+            self.logger.error(f"AI API timeout: {e}")
+            raise Exception(f"AI服务超时：请求超过30秒未响应，请稍后重试")
+        except requests.exceptions.ConnectionError as e:
+            self.logger.error(f"AI API connection error: {e}")
+            raise Exception(f"AI服务连接失败：无法连接到AI API服务器，请检查网络连接和API URL配置")
+        except requests.exceptions.HTTPError as e:
+            status_code = e.response.status_code if e.response else 0
+            if status_code == 401:
+                raise Exception("AI服务认证失败：API密钥无效或已过期，请在个人资料中更新AI API密钥")
+            elif status_code == 403:
+                raise Exception("AI服务权限不足：当前API密钥没有足够权限，请检查API密钥设置")
+            elif status_code == 429:
+                raise Exception("AI服务请求限制：API请求过于频繁，请稍后重试")
+            elif status_code == 500:
+                raise Exception("AI服务内部错误：AI服务器暂时不可用，请稍后重试")
+            else:
+                raise Exception(f"AI API错误：HTTP {status_code} - {str(e)}")
+        except json.JSONDecodeError as e:
+            self.logger.error(f"AI API response parsing error: {e}")
+            raise Exception("AI服务响应格式错误：无法解析API响应，请稍后重试")
         except Exception as e:
             self.logger.error(f"AI analysis failed: {e}")
-            return []
+            raise Exception(f"AI代码分析失败：{str(e)}")
 
     def _build_analysis_prompt(self, context: AIAnalysisContext) -> str:
         """构建AI分析提示词"""

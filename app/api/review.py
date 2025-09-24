@@ -25,7 +25,24 @@ def _perform_review_async(username: str, mr_url: str, review_id: int):
         logger.info(f"Async review completed for review_id: {review_id}")
     except Exception as e:
         logger.error(f"Error in async review {review_id}: {e}")
-        review_service.db.fail_review_record(review_id, str(e))
+
+        # 根据错误类型提供更详细的错误信息
+        error_message = str(e)
+        if "AI API" in error_message or "OpenAI" in error_message or "Claude" in error_message:
+            if "401" in error_message or "Unauthorized" in error_message:
+                error_message = f"AI服务认证失败：API密钥无效或已过期 - {error_message}"
+            elif "429" in error_message or "rate limit" in error_message.lower():
+                error_message = f"AI服务请求限制：API请求过于频繁，请稍后重试 - {error_message}"
+            elif "timeout" in error_message.lower():
+                error_message = f"AI服务超时：API请求超时，请检查网络连接或稍后重试 - {error_message}"
+            else:
+                error_message = f"AI服务错误：{error_message}"
+        elif "GitLab" in error_message:
+            error_message = f"GitLab连接错误：{error_message}"
+        else:
+            error_message = f"审查执行失败：{error_message}"
+
+        review_service.db.fail_review_record(review_id, error_message)
 
 
 @bp.route('/review', methods=['POST'])
@@ -65,12 +82,15 @@ def start_review():
 
         # 创建审查记录
         logger.info("Creating review record...")
-        review_id = review_service.create_review_record(user.username, mr_url)
-        logger.info(f"Created review record, got review_id: {review_id}")
-
-        if not review_id:
-            logger.error("Failed to create review record")
-            return jsonify({'error': '创建审查记录失败'}), 500
+        try:
+            review_id = review_service.create_review_record(user.username, mr_url)
+            logger.info(f"Created review record, got review_id: {review_id}")
+        except ValueError as ve:
+            logger.error(f"Failed to create review record: {ve}")
+            return jsonify({'error': str(ve)}), 400
+        except Exception as e:
+            logger.error(f"Unexpected error creating review record: {e}")
+            return jsonify({'error': f'创建审查记录失败：{str(e)}'}), 500
 
         # 启动后台任务
         logger.info("Starting background thread...")

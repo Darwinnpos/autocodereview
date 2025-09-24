@@ -335,43 +335,70 @@ class ReviewDatabase:
 
         return [dict(row) for row in rows]
 
-    def get_review_statistics(self, user_id: str = None, days: int = 30) -> Dict:
+    def get_reviews_count(self, user_id: str = None) -> int:
+        """获取审查记录总数"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        if user_id is None:
+            # 管理员查看所有记录总数
+            cursor.execute('SELECT COUNT(*) FROM reviews')
+        else:
+            # 普通用户查看自己的记录总数
+            cursor.execute('SELECT COUNT(*) FROM reviews WHERE user_id = ?', (user_id,))
+
+        count = cursor.fetchone()[0]
+        conn.close()
+        return count
+
+    def get_review_statistics(self, user_id: str = None, days: int = 30, start_date: str = None, end_date: str = None) -> Dict:
         """获取审查统计信息"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
         # 时间范围
         from datetime import datetime, timedelta
-        since_date = (datetime.now() - timedelta(days=days)).isoformat()
+        if start_date and end_date:
+            # 使用自定义日期范围
+            since_date = start_date
+            until_date = end_date + 'T23:59:59'  # 包含结束日期的整天
+            where_clause = 'created_at >= ? AND created_at <= ?'
+            date_params = (since_date, until_date)
+        else:
+            # 使用天数计算
+            since_date = (datetime.now() - timedelta(days=days)).isoformat()
+            where_clause = 'created_at > ?'
+            date_params = (since_date,)
 
         if user_id is None:
             # 全局统计
-            cursor.execute('SELECT COUNT(*) FROM reviews WHERE created_at > ?', (since_date,))
+            cursor.execute(f'SELECT COUNT(*) FROM reviews WHERE {where_clause}', date_params)
             total_reviews = cursor.fetchone()[0]
 
-            cursor.execute('SELECT COUNT(*) FROM reviews WHERE status = "completed" AND created_at > ?', (since_date,))
+            cursor.execute(f'SELECT COUNT(*) FROM reviews WHERE status = "completed" AND {where_clause}', date_params)
             completed_reviews = cursor.fetchone()[0]
 
-            cursor.execute('SELECT COUNT(*) FROM reviews WHERE status = "failed" AND created_at > ?', (since_date,))
+            cursor.execute(f'SELECT COUNT(*) FROM reviews WHERE status = "failed" AND {where_clause}', date_params)
             failed_reviews = cursor.fetchone()[0]
 
-            cursor.execute('SELECT SUM(total_issues_found) FROM reviews WHERE created_at > ?', (since_date,))
+            cursor.execute(f'SELECT SUM(total_issues_found) FROM reviews WHERE {where_clause}', date_params)
             total_issues = cursor.fetchone()[0] or 0
 
-            cursor.execute('SELECT COUNT(DISTINCT user_id) FROM reviews WHERE created_at > ?', (since_date,))
+            cursor.execute(f'SELECT COUNT(DISTINCT user_id) FROM reviews WHERE {where_clause}', date_params)
             active_users = cursor.fetchone()[0]
         else:
             # 用户统计
-            cursor.execute('SELECT COUNT(*) FROM reviews WHERE user_id = ? AND created_at > ?', (user_id, since_date))
+            user_params = (user_id,) + date_params
+            cursor.execute(f'SELECT COUNT(*) FROM reviews WHERE user_id = ? AND {where_clause}', user_params)
             total_reviews = cursor.fetchone()[0]
 
-            cursor.execute('SELECT COUNT(*) FROM reviews WHERE user_id = ? AND status = "completed" AND created_at > ?', (user_id, since_date))
+            cursor.execute(f'SELECT COUNT(*) FROM reviews WHERE user_id = ? AND status = "completed" AND {where_clause}', user_params)
             completed_reviews = cursor.fetchone()[0]
 
-            cursor.execute('SELECT COUNT(*) FROM reviews WHERE user_id = ? AND status = "failed" AND created_at > ?', (user_id, since_date))
+            cursor.execute(f'SELECT COUNT(*) FROM reviews WHERE user_id = ? AND status = "failed" AND {where_clause}', user_params)
             failed_reviews = cursor.fetchone()[0]
 
-            cursor.execute('SELECT SUM(total_issues_found) FROM reviews WHERE user_id = ? AND created_at > ?', (user_id, since_date))
+            cursor.execute(f'SELECT SUM(total_issues_found) FROM reviews WHERE user_id = ? AND {where_clause}', user_params)
             total_issues = cursor.fetchone()[0] or 0
 
             active_users = 1 if total_reviews > 0 else 0
@@ -387,6 +414,84 @@ class ReviewDatabase:
             'success_rate': round(completed_reviews / total_reviews * 100, 1) if total_reviews > 0 else 0,
             'days': days
         }
+
+    def get_daily_review_trend(self, days: int = 30, user_id: str = None, start_date: str = None, end_date: str = None) -> List[Dict]:
+        """获取每日审查趋势数据"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        from datetime import datetime, timedelta
+
+        # 生成日期范围
+        if start_date and end_date:
+            start_dt = datetime.fromisoformat(start_date)
+            end_dt = datetime.fromisoformat(end_date)
+        else:
+            end_dt = datetime.now()
+            start_dt = end_dt - timedelta(days=days)
+
+        start_date_str = start_dt.isoformat()
+        end_date_str = end_dt.isoformat()
+
+        if user_id is None:
+            # 全局趋势
+            cursor.execute('''
+                SELECT DATE(created_at) as date,
+                       COUNT(*) as total_count,
+                       SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed_count,
+                       SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed_count
+                FROM reviews
+                WHERE created_at >= ? AND created_at <= ?
+                GROUP BY DATE(created_at)
+                ORDER BY date
+            ''', (start_date_str, end_date_str))
+        else:
+            # 用户趋势
+            cursor.execute('''
+                SELECT DATE(created_at) as date,
+                       COUNT(*) as total_count,
+                       SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed_count,
+                       SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed_count
+                FROM reviews
+                WHERE user_id = ? AND created_at >= ? AND created_at <= ?
+                GROUP BY DATE(created_at)
+                ORDER BY date
+            ''', (user_id, start_date_str, end_date_str))
+
+        rows = cursor.fetchall()
+        conn.close()
+
+        # 创建完整的日期范围数据，填补缺失的日期
+        result = []
+        current_date = start_dt.date()
+        end_date_obj = end_dt.date()
+
+        # 将数据库结果转换为字典，方便查找
+        data_dict = {}
+        for row in rows:
+            date_str = row[0]
+            data_dict[date_str] = {
+                'date': date_str,
+                'total_count': row[1],
+                'completed_count': row[2],
+                'failed_count': row[3]
+            }
+
+        # 填充完整的日期范围
+        while current_date <= end_date_obj:
+            date_str = current_date.isoformat()
+            if date_str in data_dict:
+                result.append(data_dict[date_str])
+            else:
+                result.append({
+                    'date': date_str,
+                    'total_count': 0,
+                    'completed_count': 0,
+                    'failed_count': 0
+                })
+            current_date += timedelta(days=1)
+
+        return result
 
     def search_reviews(self, query: str, user_id: str = None, limit: int = 20) -> List[Dict]:
         return []  # Simplified

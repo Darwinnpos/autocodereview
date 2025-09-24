@@ -38,7 +38,7 @@ class ReviewService:
 
         return logger
 
-    def create_review_record(self, username: str, mr_url: str) -> Optional[int]:
+    def create_review_record(self, username: str, mr_url: str) -> int:
         """创建审查记录并返回review_id"""
         try:
             self.logger.info(f"create_review_record called with username: {username}, mr_url: {mr_url}")
@@ -47,8 +47,8 @@ class ReviewService:
             user = self.auth_db.get_user_by_username(username)
             self.logger.info(f"Found user: {user.username if user else 'None'} (ID: {user.id if user else 'None'})")
             if user is None:
-                self.logger.error("User not found, returning None")
-                return None
+                self.logger.error("User not found")
+                raise ValueError("用户信息错误：未找到用户账户，请重新登录")
 
             # 获取MR基本信息
             user_config = self.config_manager.load_user_config(str(user.id))
@@ -56,24 +56,43 @@ class ReviewService:
             if user_config:
                 self.logger.info(f"GitLab URL: {user_config.gitlab_url}")
             if not user_config:
-                self.logger.error("User config not found, returning None")
-                return None
+                self.logger.error("User config not found")
+                raise ValueError("配置错误：请在个人资料中配置GitLab连接信息（URL和访问令牌）")
 
             self.logger.info("Creating GitLab client...")
-            gitlab_client = GitLabClient(user_config.gitlab_url, user_config.access_token)
+            try:
+                gitlab_client = GitLabClient(user_config.gitlab_url, user_config.access_token)
+            except Exception as e:
+                self.logger.error(f"Failed to create GitLab client: {e}")
+                raise ValueError(f"GitLab连接失败：无法连接到GitLab服务器，请检查URL和访问令牌配置 - {str(e)}")
 
             self.logger.info("Parsing MR URL...")
-            project_path, project_id, mr_iid = gitlab_client.parse_mr_url(mr_url)
-            self.logger.info(f"Parsed MR URL - project_path: {project_path}, project_id: {project_id}, mr_iid: {mr_iid}")
+            try:
+                project_path, project_id, mr_iid = gitlab_client.parse_mr_url(mr_url)
+                self.logger.info(f"Parsed MR URL - project_path: {project_path}, project_id: {project_id}, mr_iid: {mr_iid}")
+            except Exception as e:
+                self.logger.error(f"Failed to parse MR URL: {e}")
+                raise ValueError(f"GitLab错误：无效的Merge Request URL格式 - {str(e)}")
 
             self.logger.info("Getting MR info...")
-            mr_info = gitlab_client.get_mr_info(project_id, mr_iid)
-            self.logger.info(f"MR info retrieved: {mr_info is not None}")
-            if mr_info:
-                self.logger.info(f"MR info keys: {list(mr_info.keys()) if isinstance(mr_info, dict) else 'Not a dict'}")
+            try:
+                mr_info = gitlab_client.get_mr_info(project_id, mr_iid)
+                self.logger.info(f"MR info retrieved: {mr_info is not None}")
+                if mr_info:
+                    self.logger.info(f"MR info keys: {list(mr_info.keys()) if isinstance(mr_info, dict) else 'Not a dict'}")
+            except Exception as e:
+                self.logger.error(f"Failed to get MR info: {e}")
+                if "401" in str(e) or "Unauthorized" in str(e):
+                    raise ValueError("GitLab认证失败：访问令牌无效或已过期，请更新个人资料中的GitLab访问令牌")
+                elif "403" in str(e) or "Forbidden" in str(e):
+                    raise ValueError("GitLab权限不足：您没有权限访问该项目或Merge Request")
+                elif "404" in str(e) or "Not Found" in str(e):
+                    raise ValueError("GitLab资源未找到：项目或Merge Request不存在，请检查URL是否正确")
+                else:
+                    raise ValueError(f"GitLab API错误：无法获取Merge Request信息 - {str(e)}")
+
             if not mr_info:
-                self.logger.error("Failed to get MR info, returning None")
-                return None
+                raise ValueError("GitLab错误：无法获取Merge Request详细信息，请检查URL和权限")
 
             # 创建审查记录
             review_data = {
@@ -88,13 +107,23 @@ class ReviewService:
                 'target_branch': mr_info.get('target_branch', '')
             }
 
-            review_id = self.db.create_review_record(review_data)
-            self.logger.info(f"Created review record with ID: {review_id}")
-            return review_id
+            try:
+                review_id = self.db.create_review_record(review_data)
+                self.logger.info(f"Created review record with ID: {review_id}")
+                if not review_id:
+                    raise ValueError("数据库错误：无法创建审查记录，请联系系统管理员")
+                return review_id
+            except Exception as db_e:
+                self.logger.error(f"Database error creating review record: {db_e}")
+                raise ValueError(f"数据库错误：创建审查记录失败 - {str(db_e)}")
 
+        except ValueError as ve:
+            # ValueError包含了我们自定义的用户友好错误信息
+            self.logger.error(f"Error creating review record: {ve}")
+            raise ve
         except Exception as e:
-            self.logger.error(f"Error creating review record: {e}")
-            return None
+            self.logger.error(f"Unexpected error creating review record: {e}")
+            raise ValueError(f"系统错误：创建审查记录时发生未知错误 - {str(e)}")
 
     def perform_review(self, username: str, mr_url: str, review_id: int = None) -> Dict:
         """执行完整的代码审查流程"""

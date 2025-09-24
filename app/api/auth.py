@@ -308,10 +308,12 @@ def get_all_users():
         offset = int(request.args.get('offset', 0))
 
         users = auth_db.get_all_users(limit, offset)
+        total_count = auth_db.get_users_count()
 
         return jsonify({
             'success': True,
             'users': users,
+            'total': total_count,
             'limit': limit,
             'offset': offset
         }), 200
@@ -354,6 +356,20 @@ def update_user_status(target_user_id):
                 user = auth_db.get_user_by_id(target_user_id)
                 if user and user.username == 'admin' and user.email == 'admin@autocodereview.com':
                     return jsonify({'error': '默认管理员账户受保护，不能降级为普通用户'}), 403
+        elif action == 'remove':
+            # 检查是否是默认管理员
+            user = auth_db.get_user_by_id(target_user_id)
+            if user and user.username == 'admin' and user.email == 'admin@autocodereview.com':
+                return jsonify({'error': '默认管理员账户受保护，不能删除'}), 403
+            success = auth_db.remove_user(target_user_id)
+        elif action == 'reset_password':
+            # 重置用户密码
+            new_password = data.get('new_password', '')
+            if not new_password:
+                return jsonify({'error': '请输入新密码'}), 400
+            if len(new_password) < 6:
+                return jsonify({'error': '密码长度至少6位'}), 400
+            success = auth_db.reset_user_password(target_user_id, new_password)
         else:
             return jsonify({'error': '无效的操作'}), 400
 
@@ -477,14 +493,74 @@ def get_all_reviews():
 
         # 获取所有用户的审查记录
         reviews = review_db.get_user_reviews(user_id=None, limit=limit, offset=offset)
+        total_count = review_db.get_reviews_count()
 
         return jsonify({
             'success': True,
             'reviews': reviews,
+            'total': total_count,
             'limit': limit,
             'offset': offset
         }), 200
 
     except Exception as e:
         logger.error(f"Error in get_all_reviews: {e}")
+        return jsonify({'error': '服务器内部错误'}), 500
+
+
+@bp.route('/admin/reviews/statistics', methods=['GET'])
+def get_admin_review_statistics():
+    """获取管理员审查统计信息"""
+    try:
+        user_id = session.get('user_id')
+        if not user_id:
+            return jsonify({'error': '未登录'}), 401
+
+        current_user = auth_db.get_user_by_id(user_id)
+        if not current_user or current_user.role != 'admin':
+            return jsonify({'error': '权限不足'}), 403
+
+        # 支持两种方式：days参数或start_date/end_date参数
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+
+        if start_date and end_date:
+            # 使用自定义日期范围
+            from datetime import datetime
+            try:
+                start_dt = datetime.fromisoformat(start_date)
+                end_dt = datetime.fromisoformat(end_date)
+                days = (end_dt - start_dt).days + 1
+            except ValueError:
+                return jsonify({'error': '日期格式无效，请使用YYYY-MM-DD格式'}), 400
+        else:
+            # 使用天数参数（向后兼容）
+            days = int(request.args.get('days', 30))
+            days = min(days, 365)  # 限制最大查询范围
+            start_date = None
+            end_date = None
+
+        from ..models.review import ReviewDatabase
+        review_db = ReviewDatabase()
+
+        # 获取基础统计数据
+        stats = review_db.get_review_statistics(user_id=None, days=days, start_date=start_date, end_date=end_date)
+
+        # 获取每日趋势数据
+        trend_data = review_db.get_daily_review_trend(days=days, user_id=None, start_date=start_date, end_date=end_date)
+
+        # 合并数据
+        result = {
+            **stats,
+            'trend_data': trend_data,
+            'days': days
+        }
+
+        return jsonify({
+            'success': True,
+            'data': result
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Error in get_admin_review_statistics: {e}")
         return jsonify({'error': '服务器内部错误'}), 500
