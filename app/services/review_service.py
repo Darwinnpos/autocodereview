@@ -7,15 +7,15 @@ from datetime import datetime
 from .gitlab_client import GitLabClient
 from .comment_generator import CommentGenerator
 from .ai_analyzer import AICodeAnalyzer, AIAnalysisContext, CodeIssue
-from ..models.user import UserConfig, UserConfigManager
+# UserConfig和UserConfigManager已废弃，现在使用AuthDatabase
 from ..models.review import ReviewDatabase
 from ..models.auth import AuthDatabase
 import threading
 
 
 class ReviewService:
-    def __init__(self, config_manager: UserConfigManager, db_path: str = "reviews.db"):
-        self.config_manager = config_manager
+    def __init__(self, config_manager=None, db_path: str = "reviews.db"):
+        # config_manager参数已废弃，保留用于向后兼容
         self.db = ReviewDatabase(db_path)
         self.auth_db = AuthDatabase()
         self.logger = self._setup_logger()
@@ -25,9 +25,10 @@ class ReviewService:
 
     def _setup_logger(self) -> logging.Logger:
         """设置日志记录器"""
-        logger = logging.getLogger('ReviewService')
+        logger = logging.getLogger(f'ReviewService.{id(self)}')  # 使用实例ID避免重复
         logger.setLevel(logging.INFO)
 
+        # 检查是否已经有handler，避免重复添加
         if not logger.handlers:
             handler = logging.StreamHandler()
             formatter = logging.Formatter(
@@ -35,6 +36,8 @@ class ReviewService:
             )
             handler.setFormatter(formatter)
             logger.addHandler(handler)
+            # 防止日志向上级logger传播，避免重复
+            logger.propagate = False
 
         return logger
 
@@ -169,8 +172,15 @@ class ReviewService:
                     self.logger.warning(f"Failed to get GitLab user info, using system username: {e}")
                     reviewer_name = username
 
-            # 创建用户配置对象
-            user_config = UserConfig(
+            # 创建临时配置对象（替代废弃的UserConfig）
+            class TempUserConfig:
+                def __init__(self, user_id, gitlab_url, access_token, reviewer_name):
+                    self.user_id = user_id
+                    self.gitlab_url = gitlab_url
+                    self.access_token = access_token
+                    self.reviewer_name = reviewer_name
+
+            user_config = TempUserConfig(
                 user_id=username,
                 gitlab_url=user.gitlab_url,
                 access_token=user.access_token,
@@ -699,7 +709,7 @@ class ReviewService:
         else:
             return False, "MR URL格式不正确，应该类似：https://gitlab.com/group/project/-/merge_requests/123"
 
-    def test_gitlab_connection(self, user_config: UserConfig) -> Tuple[bool, Optional[str]]:
+    def test_gitlab_connection(self, user_config) -> Tuple[bool, Optional[str]]:
         """测试GitLab连接"""
         try:
             gitlab_client = GitLabClient(user_config.gitlab_url, user_config.access_token)
@@ -757,7 +767,8 @@ class ReviewService:
         # 首先从进度表获取
         progress = self.db.get_review_progress(review_id)
         if progress:
-            self.logger.info(f"Retrieved progress for review {review_id}: {progress}")
+            # 降低日志级别，减少频繁查询的日志输出
+            self.logger.debug(f"Retrieved progress for review {review_id}: {progress}")
             return progress
 
         # 如果进度表中没有，检查审查记录状态

@@ -103,7 +103,6 @@
             <div class="card-body">
                 <ol>
                     <li>首先在<a href="/config">配置管理</a>页面设置您的GitLab访问信息</li>
-                    <li>输入您的用户ID（与配置时使用的ID一致）</li>
                     <li>粘贴GitLab Merge Request的完整URL</li>
                     <li>点击"开始审查"按钮</li>
                     <li>系统会自动分析代码并生成待确认的评论</li>
@@ -212,12 +211,42 @@ document.getElementById('reviewForm').addEventListener('submit', async function(
             throw new Error(response.data.error || '审查失败');
         }
     } catch (error) {
-        // 隐藏进度卡片，显示错误
+        // 隐藏进度卡片，显示详细错误
         progressCard.style.display = 'none';
+
+        const errorMessage = error.response?.data?.error || error.message;
+        let errorIcon = 'bi-exclamation-triangle';
+        let errorTitle = '审查失败';
+        let errorSuggestion = '';
+
+        // 根据错误类型提供具体的图标和建议
+        if (errorMessage.includes('GitLab连接失败') || errorMessage.includes('GitLab认证失败')) {
+            errorIcon = 'bi-git';
+            errorTitle = 'GitLab连接问题';
+            errorSuggestion = '<small class="text-muted">请检查个人资料中的GitLab URL和访问令牌配置</small>';
+        } else if (errorMessage.includes('GitLab权限不足') || errorMessage.includes('GitLab资源未找到')) {
+            errorIcon = 'bi-shield-exclamation';
+            errorTitle = 'GitLab权限问题';
+            errorSuggestion = '<small class="text-muted">请确保您有权限访问该项目和Merge Request</small>';
+        } else if (errorMessage.includes('AI服务') || errorMessage.includes('AI API')) {
+            errorIcon = 'bi-robot';
+            errorTitle = 'AI服务问题';
+            errorSuggestion = '<small class="text-muted">请检查个人资料中的AI API配置，或稍后重试</small>';
+        } else if (errorMessage.includes('配置错误')) {
+            errorIcon = 'bi-gear-fill';
+            errorTitle = '配置问题';
+            errorSuggestion = '<small class="text-muted">请到个人资料页面完善配置信息</small>';
+        } else if (errorMessage.includes('数据库错误')) {
+            errorIcon = 'bi-database-exclamation';
+            errorTitle = '系统错误';
+            errorSuggestion = '<small class="text-muted">系统内部错误，请联系管理员或稍后重试</small>';
+        }
+
         resultContent.innerHTML = `
             <div class="alert alert-danger">
-                <h6><i class="bi bi-exclamation-triangle"></i> 审查失败</h6>
-                <p class="mb-0">${error.response?.data?.error || error.message}</p>
+                <h6><i class="${errorIcon}"></i> ${errorTitle}</h6>
+                <p class="mb-2">${errorMessage}</p>
+                ${errorSuggestion}
             </div>
         `;
         resultCard.style.display = 'block';
@@ -403,10 +432,32 @@ async function showFinalResult(reviewId) {
         }
     } catch (error) {
         progressCard.style.display = 'none';
+
+        const errorMessage = error.response?.data?.error || error.message;
+        let errorIcon = 'bi-exclamation-triangle';
+        let errorTitle = '获取结果失败';
+        let errorSuggestion = '';
+
+        // 根据错误类型提供具体的图标和建议
+        if (errorMessage.includes('AI服务') || errorMessage.includes('AI API')) {
+            errorIcon = 'bi-robot';
+            errorTitle = 'AI分析失败';
+            errorSuggestion = '<small class="text-muted">AI服务在代码分析过程中出现问题，请检查AI配置或稍后重试</small>';
+        } else if (errorMessage.includes('GitLab')) {
+            errorIcon = 'bi-git';
+            errorTitle = 'GitLab数据获取失败';
+            errorSuggestion = '<small class="text-muted">无法从GitLab获取代码数据，请检查网络连接和权限设置</small>';
+        } else if (errorMessage.includes('数据库')) {
+            errorIcon = 'bi-database-exclamation';
+            errorTitle = '系统错误';
+            errorSuggestion = '<small class="text-muted">系统内部错误，请联系管理员</small>';
+        }
+
         resultContent.innerHTML = `
             <div class="alert alert-danger">
-                <h6><i class="bi bi-exclamation-triangle"></i> 获取结果失败</h6>
-                <p class="mb-0">${error.response?.data?.error || error.message}</p>
+                <h6><i class="${errorIcon}"></i> ${errorTitle}</h6>
+                <p class="mb-2">${errorMessage}</p>
+                ${errorSuggestion}
             </div>
         `;
         resultCard.style.display = 'block';

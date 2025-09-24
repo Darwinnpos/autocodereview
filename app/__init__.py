@@ -23,12 +23,11 @@ def create_app(config_name='default'):
 
     # 注册蓝图
     from app.api.review import bp as review_bp
-    from app.api.config import bp as config_bp
     from app.api.auth import bp as auth_bp
 
     app.register_blueprint(review_bp, url_prefix='/api')
-    app.register_blueprint(config_bp, url_prefix='/api')
     app.register_blueprint(auth_bp, url_prefix='/api')
+    # 注意：config_bp已废弃，配置功能已迁移到auth API
 
     # 初始化数据库连接池
     from app.utils.db_manager import get_auth_db_manager, get_review_db_manager

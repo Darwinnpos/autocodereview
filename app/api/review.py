@@ -5,15 +5,14 @@ import logging
 import threading
 
 from ..services.review_service import ReviewService
-from ..models.user import UserConfigManager
 from ..models.auth import AuthDatabase
 from ..utils.rate_limiter import rate_limit
 
 bp = Blueprint('review', __name__)
 
 # 初始化服务
-config_manager = UserConfigManager()
-review_service = ReviewService(config_manager)
+# 注意：UserConfigManager已废弃，ReviewService现在使用AuthDatabase
+review_service = ReviewService(None)
 auth_db = AuthDatabase()
 logger = logging.getLogger(__name__)
 
