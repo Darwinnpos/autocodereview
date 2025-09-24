@@ -267,6 +267,7 @@ function startProgressPolling(reviewId) {
 
 function updateProgress(progress) {
     console.log('updateProgress called with:', progress);
+
     // 更新状态文本
     const statusTexts = {
         'preparing': '准备中...',
@@ -279,6 +280,24 @@ function updateProgress(progress) {
     const statusText = statusTexts[progress.status] || progress.status;
     console.log('Setting status text to:', statusText);
     document.getElementById('progressStatus').textContent = statusText;
+
+    // 更新按钮状态
+    const submitBtn = document.querySelector('button[type="submit"]');
+    const buttonTexts = {
+        'preparing': '<span class="spinner-border spinner-border-sm" role="status"></span> 启动中...',
+        'analyzing': '<span class="spinner-border spinner-border-sm" role="status"></span> 审查中...',
+        'generating_comments': '<span class="spinner-border spinner-border-sm" role="status"></span> 生成评论中...',
+        'saving_results': '<span class="spinner-border spinner-border-sm" role="status"></span> 保存结果中...',
+        'completed': '<i class="bi bi-play"></i> 开始审查',
+        'failed': '<i class="bi bi-play"></i> 开始审查'
+    };
+
+    const buttonText = buttonTexts[progress.status] || '<span class="spinner-border spinner-border-sm" role="status"></span> 处理中...';
+    if (submitBtn) {
+        submitBtn.innerHTML = buttonText;
+        // 只有在完成或失败时才启用按钮
+        submitBtn.disabled = !['completed', 'failed'].includes(progress.status);
+    }
 
     // 更新进度条
     let percentage = 0;

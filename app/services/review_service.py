@@ -41,28 +41,47 @@ class ReviewService:
     def create_review_record(self, username: str, mr_url: str) -> Optional[int]:
         """创建审查记录并返回review_id"""
         try:
+            self.logger.info(f"create_review_record called with username: {username}, mr_url: {mr_url}")
+
             # 获取用户信息
             user = self.auth_db.get_user_by_username(username)
+            self.logger.info(f"Found user: {user.username if user else 'None'} (ID: {user.id if user else 'None'})")
             if user is None:
+                self.logger.error("User not found, returning None")
                 return None
 
             # 获取MR基本信息
             user_config = self.config_manager.load_user_config(str(user.id))
+            self.logger.info(f"User config loaded: {user_config is not None}")
+            if user_config:
+                self.logger.info(f"GitLab URL: {user_config.gitlab_url}")
             if not user_config:
+                self.logger.error("User config not found, returning None")
                 return None
 
+            self.logger.info("Creating GitLab client...")
             gitlab_client = GitLabClient(user_config.gitlab_url, user_config.access_token)
-            mr_info = gitlab_client.get_mr_info(mr_url)
+
+            self.logger.info("Parsing MR URL...")
+            project_path, project_id, mr_iid = gitlab_client.parse_mr_url(mr_url)
+            self.logger.info(f"Parsed MR URL - project_path: {project_path}, project_id: {project_id}, mr_iid: {mr_iid}")
+
+            self.logger.info("Getting MR info...")
+            mr_info = gitlab_client.get_mr_info(project_id, mr_iid)
+            self.logger.info(f"MR info retrieved: {mr_info is not None}")
+            if mr_info:
+                self.logger.info(f"MR info keys: {list(mr_info.keys()) if isinstance(mr_info, dict) else 'Not a dict'}")
             if not mr_info:
+                self.logger.error("Failed to get MR info, returning None")
                 return None
 
             # 创建审查记录
             review_data = {
                 'user_id': username,
                 'mr_url': mr_url,
-                'project_path': mr_info.get('project_id', ''),
-                'project_id': str(mr_info.get('id', '')),
-                'mr_iid': mr_info.get('iid', 0),
+                'project_path': project_path,
+                'project_id': project_id,
+                'mr_iid': mr_iid,
                 'mr_title': mr_info.get('title', ''),
                 'mr_author': mr_info.get('author', {}).get('name', ''),
                 'source_branch': mr_info.get('source_branch', ''),

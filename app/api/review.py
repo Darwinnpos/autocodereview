@@ -32,17 +32,22 @@ def _perform_review_async(username: str, mr_url: str, review_id: int):
 def start_review():
     """启动代码审查（异步）"""
     try:
+        logger.info("=== Starting review API call ===")
+
         # 检查用户登录状态
         user_id = session.get('user_id')
+        logger.info(f"Session user_id: {user_id}")
         if not user_id:
             return jsonify({'error': '请先登录'}), 401
 
         # 获取当前用户信息
         user = auth_db.get_user_by_id(user_id)
+        logger.info(f"Found user: {user.username if user else 'None'}")
         if not user:
             return jsonify({'error': '用户不存在'}), 404
 
         data = request.get_json()
+        logger.info(f"Request data: {data}")
 
         # 验证请求数据
         if not data:
@@ -53,24 +58,32 @@ def start_review():
             return jsonify({'error': '缺少MR URL'}), 400
 
         # 验证MR URL格式
+        logger.info(f"Validating MR URL: {mr_url}")
         is_valid, error_msg = review_service.validate_mr_url(mr_url)
         if not is_valid:
             return jsonify({'error': error_msg}), 400
 
         # 创建审查记录
+        logger.info("Creating review record...")
         review_id = review_service.create_review_record(user.username, mr_url)
+        logger.info(f"Created review record, got review_id: {review_id}")
+
         if not review_id:
+            logger.error("Failed to create review record")
             return jsonify({'error': '创建审查记录失败'}), 500
 
         # 启动后台任务
+        logger.info("Starting background thread...")
         thread = threading.Thread(
             target=_perform_review_async,
             args=(user.username, mr_url, review_id),
             daemon=True
         )
         thread.start()
+        logger.info("Background thread started")
 
         # 立即返回review_id
+        logger.info(f"Returning success response with review_id: {review_id}")
         return jsonify({
             'success': True,
             'message': '审查已启动',
@@ -79,6 +92,8 @@ def start_review():
 
     except Exception as e:
         logger.error(f"Error in start_review: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         return jsonify({'error': '服务器内部错误'}), 500
 
 
