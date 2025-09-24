@@ -1,3 +1,4 @@
+![cd8be7f3c553d3a372a842867584a057](https://github.com/user-attachments/assets/31483172-a741-4c39-a3fe-0843f6faea08)
 # AutoCodeReview - 自动化代码审查系统
 
 基于Flask的自动化代码审查系统，支持GitLab集成，能够自动分析代码并在Merge Request中添加精准的行级评论。
