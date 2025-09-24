@@ -35,6 +35,14 @@
         .severity-info {
             color: #0dcaf0;
         }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-height: 400px;
+        }
+        .chart-container canvas {
+            max-height: 100% !important;
+        }
     </style>
     {% block styles %}{% endblock %}
 </head>
@@ -107,6 +115,8 @@
 
     <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
     <script src="{{ url_for('static', filename='js/axios.min.js') }}"></script>
+    <!-- Chart.js本地版本用于内网环境 -->
+    <script src="{{ url_for('static', filename='js/chart.min.js') }}"></script>
 
     <script>
     // 全局会话管理

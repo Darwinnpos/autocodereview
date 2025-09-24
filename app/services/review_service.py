@@ -50,14 +50,21 @@ class ReviewService:
                 self.logger.error("User not found")
                 raise ValueError("用户信息错误：未找到用户账户，请重新登录")
 
-            # 获取MR基本信息
-            user_config = self.config_manager.load_user_config(str(user.id))
-            self.logger.info(f"User config loaded: {user_config is not None}")
-            if user_config:
-                self.logger.info(f"GitLab URL: {user_config.gitlab_url}")
-            if not user_config:
-                self.logger.error("User config not found")
+            # 获取MR基本信息 - 从AuthDatabase获取最新配置
+            if not user.gitlab_url or not user.access_token:
+                self.logger.error("GitLab config not found in user profile")
                 raise ValueError("配置错误：请在个人资料中配置GitLab连接信息（URL和访问令牌）")
+
+            self.logger.info(f"GitLab URL from user profile: {user.gitlab_url}")
+
+            # 创建临时配置对象用于兼容性
+            class TempConfig:
+                def __init__(self, gitlab_url, access_token, reviewer_name):
+                    self.gitlab_url = gitlab_url
+                    self.access_token = access_token
+                    self.reviewer_name = reviewer_name
+
+            user_config = TempConfig(user.gitlab_url, user.access_token, user.reviewer_name or "AutoCodeReview")
 
             self.logger.info("Creating GitLab client...")
             try:
@@ -128,9 +135,10 @@ class ReviewService:
     def perform_review(self, username: str, mr_url: str, review_id: int = None) -> Dict:
         """执行完整的代码审查流程"""
         try:
-            # 1. 获取用户信息
+            # 1. 获取用户信息（重新获取以确保是最新配置）
             self.logger.info(f"Starting code review for user {username}, MR: {mr_url}")
             user = self.auth_db.get_user_by_username(username)
+            self.logger.info(f"User GitLab URL in perform_review: {user.gitlab_url if user else 'User not found'}")
 
             if user is None:
                 return {
