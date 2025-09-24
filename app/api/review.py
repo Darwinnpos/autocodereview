@@ -22,7 +22,15 @@ def _perform_review_async(username: str, mr_url: str, review_id: int):
     try:
         logger.info(f"Starting async review for review_id: {review_id}")
         result = review_service.perform_review(username, mr_url, review_id)
-        logger.info(f"Async review completed for review_id: {review_id}")
+
+        # 检查审查结果
+        if result and not result.get('success', False):
+            error_msg = result.get('error', '未知错误')
+            logger.error(f"Review failed for review_id {review_id}: {error_msg}")
+            review_service.db.fail_review_record(review_id, error_msg)
+        else:
+            logger.info(f"Async review completed successfully for review_id: {review_id}")
+
     except Exception as e:
         logger.error(f"Error in async review {review_id}: {e}")
 
