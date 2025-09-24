@@ -30,6 +30,16 @@ def create_app(config_name='default'):
     app.register_blueprint(config_bp, url_prefix='/api')
     app.register_blueprint(auth_bp, url_prefix='/api')
 
+    # 初始化数据库连接池
+    from app.utils.db_manager import get_auth_db_manager, get_review_db_manager
+    get_auth_db_manager()  # 初始化认证数据库连接池
+    get_review_db_manager()  # 初始化审查数据库连接池
+
+    # 注册应用关闭处理
+    import atexit
+    from app.utils.db_manager import close_all_connections
+    atexit.register(close_all_connections)
+
     # 注册错误处理器
     @app.errorhandler(404)
     def not_found(error):

@@ -7,6 +7,7 @@ import threading
 from ..services.review_service import ReviewService
 from ..models.user import UserConfigManager
 from ..models.auth import AuthDatabase
+from ..utils.rate_limiter import rate_limit
 
 bp = Blueprint('review', __name__)
 
@@ -54,6 +55,7 @@ def _perform_review_async(username: str, mr_url: str, review_id: int):
 
 
 @bp.route('/review', methods=['POST'])
+@rate_limit('review', tokens=5)  # 审查操作消费5个令牌
 def start_review():
     """启动代码审查（异步）"""
     try:
@@ -435,4 +437,45 @@ def get_review_result(review_id: int):
 
     except Exception as e:
         logger.error(f"Error in get_review_result: {e}")
+        return jsonify({'error': '服务器内部错误'}), 500
+
+
+@bp.route('/system/stats', methods=['GET'])
+def get_system_stats():
+    """获取系统统计信息（管理员）"""
+    try:
+        user_id = session.get('user_id')
+        if not user_id:
+            return jsonify({'error': '未登录'}), 401
+
+        current_user = auth_db.get_user_by_id(user_id)
+        if not current_user or current_user.role != 'admin':
+            return jsonify({'error': '权限不足'}), 403
+
+        from ..utils.rate_limiter import get_rate_limit_stats
+        from ..utils.db_manager import get_auth_db_manager, get_review_db_manager
+
+        # 获取限流统计
+        rate_stats = get_rate_limit_stats()
+
+        # 获取数据库连接池统计
+        auth_db_stats = get_auth_db_manager().get_stats()
+        review_db_stats = get_review_db_manager().get_stats()
+
+        return jsonify({
+            'success': True,
+            'data': {
+                'rate_limiting': rate_stats,
+                'database_pools': {
+                    'auth_db': auth_db_stats,
+                    'review_db': review_db_stats
+                },
+                'system_info': {
+                    'active_threads': threading.active_count(),
+                }
+            }
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Error in get_system_stats: {e}")
         return jsonify({'error': '服务器内部错误'}), 500

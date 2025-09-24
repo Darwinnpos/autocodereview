@@ -5,6 +5,7 @@ import logging
 import re
 
 from ..models.auth import AuthDatabase, User
+from ..utils.rate_limiter import rate_limit
 
 bp = Blueprint('auth', __name__)
 
@@ -46,6 +47,7 @@ def test_gitlab_connection(gitlab_url: str, access_token: str) -> tuple[bool, st
 
 
 @bp.route('/register', methods=['POST'])
+@rate_limit('default', tokens=3)  # 注册操作消费3个令牌
 def register():
     """用户注册"""
     try:
@@ -97,6 +99,7 @@ def register():
 
 
 @bp.route('/login', methods=['POST'])
+@rate_limit('default', tokens=2)  # 登录操作消费2个令牌
 def login():
     """用户登录"""
     try:
