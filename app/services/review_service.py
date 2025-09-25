@@ -531,7 +531,7 @@ class ReviewService:
         # 为每个评论添加代码上下文
         for comment in pending_comments:
             try:
-                # 获取代码上下文（前后10行）
+                # 获取代码上下文（前后5行）
                 code_context = self._get_code_context_for_review(
                     review,
                     comment['file_path'],
@@ -544,7 +544,7 @@ class ReviewService:
 
         return pending_comments
 
-    def _get_code_context_for_review(self, review: Dict, file_path: str, line_number: int, context_lines: int = 10) -> Dict:
+    def _get_code_context_for_review(self, review: Dict, file_path: str, line_number: int, context_lines: int = 5) -> Dict:
         """为指定审查获取代码上下文"""
         try:
             # 获取用户配置 - 尝试不同的方法获取用户
@@ -624,7 +624,7 @@ class ReviewService:
             self.logger.error(f"Error getting code context for review: {e}")
             return None
 
-    def _get_code_context(self, mr_url: str, file_path: str, line_number: int, context_lines: int = 10) -> Dict:
+    def _get_code_context(self, mr_url: str, file_path: str, line_number: int, context_lines: int = 5) -> Dict:
         """获取指定文件行的代码上下文"""
         try:
             # 清理MR URL，移除可能的/diffs后缀
