@@ -190,6 +190,7 @@ def get_profile():
                 'ai_api_key': '已设置' if user.ai_api_key else '',  # 只显示是否已设置
                 'ai_model': user.ai_model,
                 'review_config': user.review_config,
+                'review_severity_level': user.review_severity_level,
                 'created_at': user.created_at,
                 'last_login': user.last_login,
                 'login_count': user.login_count
@@ -240,6 +241,13 @@ def update_profile():
 
         if 'review_config' in data:
             update_fields['review_config'] = data['review_config']
+
+        if 'review_severity_level' in data:
+            severity_level = data['review_severity_level'].strip()
+            if severity_level in ['strict', 'standard', 'relaxed']:
+                update_fields['review_severity_level'] = severity_level
+            else:
+                return jsonify({'error': '无效的严重程度等级'}), 400
 
         # 如果提供了GitLab配置，验证连接
         if 'gitlab_url' in update_fields and 'access_token' in update_fields:

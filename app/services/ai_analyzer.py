@@ -34,6 +34,7 @@ class AICodeAnalyzer:
         self.ai_api_url = ai_config.get('ai_api_url', 'https://api.openai.com/v1')
         self.ai_api_key = ai_config.get('ai_api_key', '')
         self.ai_model = ai_config.get('ai_model', 'gpt-3.5-turbo')
+        self.severity_level = ai_config.get('review_severity_level', 'standard')
         self.logger = logging.getLogger(__name__)
 
     def analyze_code_with_ai(self, context: AIAnalysisContext) -> List[CodeIssue]:
@@ -52,7 +53,10 @@ class AICodeAnalyzer:
             # 解析AI响应
             issues = self._parse_ai_response(response, context)
 
-            return issues
+            # 根据严重程度等级过滤结果
+            filtered_issues = self._filter_issues_by_severity(issues)
+
+            return filtered_issues
 
         except requests.exceptions.Timeout as e:
             self.logger.error(f"AI API timeout: {e}")
@@ -316,3 +320,34 @@ class AICodeAnalyzer:
             'xml': 'xml'
         }
         return language_map.get(extension, 'text')
+
+    def _filter_issues_by_severity(self, issues: List[CodeIssue]) -> List[CodeIssue]:
+        """根据严重程度等级过滤问题"""
+        if not issues:
+            return issues
+
+        # 定义各等级允许的严重程度
+        allowed_severities = {
+            'strict': ['error', 'warning', 'info'],      # 严格模式：检查所有问题
+            'standard': ['error', 'warning'],            # 标准模式：检查错误和警告
+            'relaxed': ['error']                         # 宽松模式：只检查错误
+        }
+
+        current_allowed = allowed_severities.get(self.severity_level, ['error', 'warning'])
+
+        # 过滤问题
+        filtered_issues = []
+        for issue in issues:
+            # 检查issue是字典还是对象
+            if isinstance(issue, dict):
+                severity = issue.get('severity', 'info')
+            else:
+                severity = getattr(issue, 'severity', 'info')
+
+            if severity in current_allowed:
+                filtered_issues.append(issue)
+            else:
+                self.logger.debug(f"过滤掉严重程度为 {severity} 的问题（当前等级：{self.severity_level}）")
+
+        self.logger.info(f"严重程度过滤：{len(issues)} -> {len(filtered_issues)} （等级：{self.severity_level}）")
+        return filtered_issues

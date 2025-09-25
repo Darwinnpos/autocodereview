@@ -23,6 +23,7 @@ class User:
     ai_api_key: str
     ai_model: str
     review_config: str
+    review_severity_level: str  # 'strict', 'standard', 'relaxed'
     is_active: bool
     created_at: str
     last_login: str
@@ -56,6 +57,7 @@ class AuthDatabase:
                 ai_api_key TEXT NOT NULL DEFAULT '',
                 ai_model TEXT NOT NULL DEFAULT 'gpt-3.5-turbo',
                 review_config TEXT,
+                review_severity_level TEXT NOT NULL DEFAULT 'standard',
                 is_active BOOLEAN DEFAULT 1,
                 created_at TEXT NOT NULL,
                 last_login TEXT,
@@ -75,11 +77,13 @@ class AuthDatabase:
             )
         ''')
 
-        # 添加 review_config 字段（如果不存在）
+        # 添加新字段（如果不存在）
         cursor.execute("PRAGMA table_info(users)")
         columns = [column[1] for column in cursor.fetchall()]
         if 'review_config' not in columns:
             cursor.execute('ALTER TABLE users ADD COLUMN review_config TEXT')
+        if 'review_severity_level' not in columns:
+            cursor.execute("ALTER TABLE users ADD COLUMN review_severity_level TEXT NOT NULL DEFAULT 'standard'")
 
         # 创建索引
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_users_username ON users (username)')
@@ -276,7 +280,8 @@ class AuthDatabase:
         return None
 
     def update_user_config(self, user_id: int, gitlab_url: str, access_token: str, reviewer_name: str,
-                          ai_api_url: str = None, ai_api_key: str = None, ai_model: str = None, review_config: str = None) -> bool:
+                          ai_api_url: str = None, ai_api_key: str = None, ai_model: str = None,
+                          review_config: str = None, review_severity_level: str = None) -> bool:
         """更新用户配置"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -300,6 +305,10 @@ class AuthDatabase:
         if review_config is not None:
             update_fields.append('review_config = ?')
             update_values.append(review_config)
+
+        if review_severity_level is not None:
+            update_fields.append('review_severity_level = ?')
+            update_values.append(review_severity_level)
 
         update_values.append(user_id)
 

@@ -261,7 +261,8 @@ class ReviewService:
             ai_config = {
                 'ai_api_url': user.ai_api_url,
                 'ai_api_key': user.ai_api_key,
-                'ai_model': user.ai_model
+                'ai_model': user.ai_model,
+                'review_severity_level': getattr(user, 'review_severity_level', 'standard')
             }
             ai_analyzer = AICodeAnalyzer(ai_config)
             self.logger.info("AI analyzer initialized")
