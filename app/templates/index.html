@@ -709,26 +709,29 @@ function generateCommentHtml(comment, reviewId) {
                 </div>
             </div>
             <div class="card-body">
-                <div class="mb-3">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <strong>代码上下文:</strong>
-                        <button class="btn btn-outline-primary btn-sm" onclick="toggleCodeContext(${reviewId}, ${comment.id})">
-                            <i class="bi bi-code-slash"></i>
-                            <span class="toggle-text">显示代码</span>
-                        </button>
-                    </div>
-                    <div class="code-context-container mt-2" id="context-${comment.id}" style="display: none;">
-                        <div class="text-center p-3">
-                            <div class="spinner-border spinner-border-sm" role="status">
-                                <span class="visually-hidden">加载中...</span>
-                            </div>
-                            <div class="mt-2 text-muted">正在加载代码上下文...</div>
+                <!-- 代码上下文按钮 -->
+                <div class="mb-3 text-center">
+                    <button class="btn btn-outline-primary btn-sm context-toggle-btn" onclick="toggleCodeContext(${reviewId}, ${comment.id})" data-issue-id="${comment.id}">
+                        <i class="bi bi-code-slash"></i>
+                        <span class="toggle-text">显示代码</span>
+                    </button>
+                </div>
+
+                <!-- 代码上下文容器 -->
+                <div class="code-context-container mb-3" id="context-${comment.id}" style="display: none;">
+                    <div class="text-center p-3 border rounded bg-light">
+                        <div class="spinner-border spinner-border-sm" role="status">
+                            <span class="visually-hidden">加载中...</span>
                         </div>
+                        <div class="mt-2 text-muted">正在加载代码上下文...</div>
                     </div>
                 </div>
 
-                <p class="mb-2"><strong>问题:</strong> ${comment.message}</p>
-                <p class="mb-2"><strong>建议:</strong> ${comment.suggestion || '无'}</p>
+                <!-- 问题和建议 -->
+                <div class="border-top pt-3">
+                    <p class="mb-2"><strong>问题:</strong> ${comment.message}</p>
+                    <p class="mb-0"><strong>建议:</strong> ${comment.suggestion || '无'}</p>
+                </div>
 
             </div>
         </div>
@@ -802,7 +805,7 @@ const loadedContexts = new Map();
 
 async function toggleCodeContext(reviewId, issueId) {
     const container = document.getElementById(`context-${issueId}`);
-    const button = container.parentElement.querySelector('button');
+    const button = document.querySelector(`[data-issue-id="${issueId}"]`);
     const toggleText = button.querySelector('.toggle-text');
 
     if (container.style.display === 'none') {
@@ -814,6 +817,8 @@ async function toggleCodeContext(reviewId, issueId) {
         if (loadedContexts.has(issueId)) {
             container.innerHTML = loadedContexts.get(issueId);
             toggleText.textContent = '隐藏代码';
+            button.classList.remove('btn-outline-primary');
+            button.classList.add('btn-primary');
             button.disabled = false;
             return;
         }
@@ -832,6 +837,8 @@ async function toggleCodeContext(reviewId, issueId) {
                 loadedContexts.set(issueId, contextHtml);
                 container.innerHTML = contextHtml;
                 toggleText.textContent = '隐藏代码';
+                button.classList.remove('btn-outline-primary');
+                button.classList.add('btn-primary');
             } else {
                 container.innerHTML = `
                     <div class="alert alert-warning">
@@ -860,6 +867,8 @@ async function toggleCodeContext(reviewId, issueId) {
         // 隐藏代码上下文
         container.style.display = 'none';
         toggleText.textContent = '显示代码';
+        button.classList.remove('btn-primary');
+        button.classList.add('btn-outline-primary');
     }
 }
 
