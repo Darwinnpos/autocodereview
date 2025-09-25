@@ -125,3 +125,25 @@ class GitLabClient:
         except Exception as e:
             print(f"DEBUG: Error posting comment: {e}")
             return False
+
+    def get_file_content(self, project_id: str, file_path: str, ref: str) -> Optional[str]:
+        """获取文件内容"""
+        try:
+            # URL编码文件路径
+            import urllib.parse
+            encoded_path = urllib.parse.quote(file_path, safe='')
+
+            url = f"{self.gitlab_url}/api/v4/projects/{project_id}/repository/files/{encoded_path}/raw"
+            params = {'ref': ref}
+
+            response = requests.get(url, headers=self.headers, params=params)
+
+            if response.status_code == 200:
+                return response.text
+            else:
+                print(f"Failed to get file content: {response.status_code} - {response.text}")
+                return None
+
+        except Exception as e:
+            print(f"Error getting file content: {e}")
+            return None

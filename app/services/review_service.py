@@ -520,8 +520,190 @@ class ReviewService:
         return self.db.export_review_data(review_id)
 
     def get_pending_comments(self, review_id: int) -> List[Dict]:
-        """获取待确认的评论"""
-        return self.db.get_pending_comments(review_id)
+        """获取待确认的评论（包含代码上下文）"""
+        pending_comments = self.db.get_pending_comments(review_id)
+
+        # 获取审查信息以获取项目路径
+        review = self.db.get_review_record(review_id)
+        if not review:
+            return pending_comments
+
+        # 为每个评论添加代码上下文
+        for comment in pending_comments:
+            try:
+                # 获取代码上下文（前后10行）
+                code_context = self._get_code_context_for_review(
+                    review,
+                    comment['file_path'],
+                    comment['line_number']
+                )
+                comment['code_context'] = code_context
+            except Exception as e:
+                self.logger.warning(f"Failed to get code context for {comment['file_path']}:{comment['line_number']}: {e}")
+                comment['code_context'] = None
+
+        return pending_comments
+
+    def _get_code_context_for_review(self, review: Dict, file_path: str, line_number: int, context_lines: int = 10) -> Dict:
+        """为指定审查获取代码上下文"""
+        try:
+            # 获取用户配置 - 尝试不同的方法获取用户
+            user = None
+            if review['user_id'].isdigit():
+                # 如果是数字，作为用户ID查询
+                user = self.auth_db.get_user_by_id(int(review['user_id']))
+            else:
+                # 如果是字符串，作为用户名查询
+                user = self.auth_db.get_user_by_username(review['user_id'])
+
+            if not user or not user.gitlab_url or not user.access_token:
+                self.logger.warning(f"User or GitLab config missing for user: {review['user_id']}")
+                return None
+
+            # 创建GitLab客户端
+            gitlab_client = GitLabClient(user.gitlab_url, user.access_token)
+
+            # 获取文件内容
+            file_content = gitlab_client.get_file_content(
+                review['project_id'],
+                file_path,
+                review['source_branch']
+            )
+
+            if not file_content:
+                self.logger.warning(f"Could not get file content for {file_path}")
+                return None
+
+            # 分割文件内容为行
+            lines = file_content.split('\n')
+
+            # 计算上下文范围
+            start_line = max(1, line_number - context_lines)
+            end_line = min(len(lines), line_number + context_lines)
+            target_index = line_number - 1  # 转换为0基索引
+
+            # 验证目标行是否存在
+            if target_index < 0 or target_index >= len(lines):
+                self.logger.warning(f"Target line {line_number} out of range for file {file_path}")
+                return None
+
+            # 提取上下文行
+            lines_before = []
+            lines_after = []
+            target_line = lines[target_index] if target_index < len(lines) else ''
+
+            # 获取目标行之前的行
+            for i in range(start_line - 1, target_index):
+                if i >= 0 and i < len(lines):
+                    lines_before.append({
+                        'line_number': i + 1,
+                        'content': lines[i]
+                    })
+
+            # 获取目标行之后的行
+            for i in range(target_index + 1, min(len(lines), end_line)):
+                lines_after.append({
+                    'line_number': i + 1,
+                    'content': lines[i]
+                })
+
+            return {
+                'lines_before': lines_before,
+                'target_line': {
+                    'line_number': line_number,
+                    'content': target_line
+                },
+                'lines_after': lines_after,
+                'start_line_number': start_line,
+                'end_line_number': end_line,
+                'target_line_number': line_number,
+                'file_path': file_path
+            }
+
+        except Exception as e:
+            self.logger.error(f"Error getting code context for review: {e}")
+            return None
+
+    def _get_code_context(self, mr_url: str, file_path: str, line_number: int, context_lines: int = 10) -> Dict:
+        """获取指定文件行的代码上下文"""
+        try:
+            # 清理MR URL，移除可能的/diffs后缀
+            clean_mr_url = mr_url.rstrip('/diffs')
+
+            # 从reviews表中获取用户信息
+            review = self.db.get_review_by_mr_url(clean_mr_url)
+            if not review:
+                # 如果找不到，尝试原始URL
+                review = self.db.get_review_by_mr_url(mr_url)
+                if not review:
+                    return None
+
+            # 获取用户配置
+            user = self.auth_db.get_user_by_username(review['user_id'])
+            if not user or not user.gitlab_url or not user.access_token:
+                return None
+
+            # 创建GitLab客户端
+            gitlab_client = GitLabClient(user.gitlab_url, user.access_token)
+
+            # 获取文件内容
+            file_content = gitlab_client.get_file_content(
+                review['project_id'],
+                file_path,
+                review['source_branch']
+            )
+
+            if not file_content:
+                return None
+
+            # 分割文件内容为行
+            lines = file_content.split('\n')
+
+            # 计算上下文范围
+            start_line = max(1, line_number - context_lines)
+            end_line = min(len(lines), line_number + context_lines)
+            target_index = line_number - 1  # 转换为0基索引
+
+            # 验证目标行是否存在
+            if target_index < 0 or target_index >= len(lines):
+                return None
+
+            # 提取上下文行
+            lines_before = []
+            lines_after = []
+            target_line = lines[target_index] if target_index < len(lines) else ''
+
+            # 获取目标行之前的行
+            for i in range(start_line - 1, target_index):
+                if i >= 0 and i < len(lines):
+                    lines_before.append({
+                        'line_number': i + 1,
+                        'content': lines[i]
+                    })
+
+            # 获取目标行之后的行
+            for i in range(target_index + 1, min(len(lines), end_line)):
+                lines_after.append({
+                    'line_number': i + 1,
+                    'content': lines[i]
+                })
+
+            return {
+                'lines_before': lines_before,
+                'target_line': {
+                    'line_number': line_number,
+                    'content': target_line
+                },
+                'lines_after': lines_after,
+                'start_line_number': start_line,
+                'end_line_number': end_line,
+                'target_line_number': line_number,
+                'file_path': file_path
+            }
+
+        except Exception as e:
+            self.logger.error(f"Error getting code context: {e}")
+            return None
 
     def confirm_comment(self, review_id: int, issue_id: int) -> bool:
         """确认并发布单个评论"""

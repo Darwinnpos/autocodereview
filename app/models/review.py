@@ -274,6 +274,18 @@ class ReviewDatabase:
 
         return dict(row) if row else None
 
+    def get_review_by_mr_url(self, mr_url: str) -> Optional[Dict]:
+        """根据MR URL获取审查记录"""
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        cursor.execute('SELECT * FROM reviews WHERE mr_url = ? ORDER BY created_at DESC LIMIT 1', (mr_url,))
+        row = cursor.fetchone()
+        conn.close()
+
+        return dict(row) if row else None
+
     def get_review_issues(self, review_id: int) -> List[Dict]:
         """获取审查的问题列表"""
         conn = sqlite3.connect(self.db_path)

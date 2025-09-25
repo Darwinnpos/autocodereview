@@ -269,16 +269,26 @@ function resetProgress() {
 
 function startProgressPolling(reviewId) {
     console.log('Starting progress polling for review:', reviewId);
+
+    // 立即设置按钮为稳定的审查状态
+    const submitBtn = document.querySelector('button[type="submit"]');
+    if (submitBtn) {
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> 审查中...';
+        submitBtn.disabled = true;
+    }
+
+    // 设置进度状态为审查中
+    document.getElementById('progressStatus').textContent = '正在分析代码...';
+
+    // 使用更长的间隔进行轮询，仅检查是否完成
     reviewProgressInterval = setInterval(async () => {
         try {
-            console.log('Polling progress for review:', reviewId);
             const response = await axios.get(`/api/review/${reviewId}/progress`);
-            console.log('Progress response:', response.data);
-            console.log('Raw progress data:', response.data.data);
             if (response.data.success) {
                 const progress = response.data.data;
-                console.log('About to update progress with:', progress);
-                updateProgress(progress);
+
+                // 只更新文件计数和进度条，不频繁更新按钮状态
+                updateProgressCounts(progress);
 
                 // 如果审查完成，停止轮询并显示结果
                 if (progress.status === 'completed' || progress.status === 'failed') {
@@ -291,7 +301,64 @@ function startProgressPolling(reviewId) {
         } catch (error) {
             console.error('获取进度失败:', error);
         }
-    }, 1000); // 每秒轮询一次
+    }, 5000); // 每5秒轮询一次，减少频率
+}
+
+function updateProgressCounts(progress) {
+    console.log('updateProgressCounts called with:', progress);
+
+    // 更新状态文本
+    const statusTexts = {
+        'preparing': '准备中...',
+        'analyzing': '正在分析代码...',
+        'generating_comments': '正在生成评论...',
+        'saving_results': '正在保存结果...',
+        'completed': '分析完成！',
+        'failed': '分析失败'
+    };
+    const statusText = statusTexts[progress.status] || progress.status;
+    document.getElementById('progressStatus').textContent = statusText;
+
+    // 更新进度条
+    let percentage = 0;
+    if (progress.status === 'preparing' || progress.total_files === 0) {
+        // 准备阶段显示不确定进度
+        percentage = 10; // 显示一点进度表示已开始
+        document.getElementById('progressBar').classList.add('progress-bar-animated');
+    } else {
+        percentage = Math.round((progress.processed_files / Math.max(progress.total_files, 1)) * 100);
+        document.getElementById('progressBar').classList.remove('progress-bar-animated');
+    }
+
+    document.getElementById('progressBar').style.width = percentage + '%';
+    document.getElementById('progressBar').textContent = percentage + '%';
+    document.getElementById('progressBar').setAttribute('aria-valuenow', percentage);
+
+    // 更新文件计数
+    document.getElementById('processedFiles').textContent = progress.processed_files;
+    if (progress.status === 'preparing' && progress.total_files === 0) {
+        document.getElementById('totalFiles').textContent = '...';
+    } else {
+        document.getElementById('totalFiles').textContent = progress.total_files;
+    }
+    document.getElementById('foundIssues').textContent = progress.total_issues;
+
+    // 更新当前文件信息
+    if (progress.current_file && progress.status === 'analyzing') {
+        document.getElementById('currentFileName').textContent = progress.current_file;
+        document.getElementById('currentFileInfo').style.display = 'block';
+    } else {
+        document.getElementById('currentFileInfo').style.display = 'none';
+    }
+
+    // 根据状态调整进度条颜色
+    const progressBar = document.getElementById('progressBar');
+    progressBar.className = 'progress-bar progress-bar-striped progress-bar-animated';
+    if (progress.status === 'completed') {
+        progressBar.classList.add('bg-success');
+    } else if (progress.status === 'failed') {
+        progressBar.classList.add('bg-danger');
+    }
 }
 
 function updateProgress(progress) {
@@ -565,6 +632,16 @@ function showPendingCommentsModal(comments, reviewId) {
                                     <div class="card-body">
                                         <p class="mb-2"><strong>问题:</strong> ${comment.message}</p>
                                         <p class="mb-2"><strong>建议:</strong> ${comment.suggestion || '无'}</p>
+
+                                        ${comment.code_context ? `
+                                            <div class="mb-3">
+                                                <strong>代码上下文:</strong>
+                                                <div class="code-context mt-2 bg-dark text-white p-3 rounded" style="font-family: 'Courier New', monospace; font-size: 12px; overflow-x: auto;">
+                                                    ${renderCodeContext(comment.code_context)}
+                                                </div>
+                                            </div>
+                                        ` : ''}
+
                                         <div class="bg-light p-3 rounded">
                                             <strong>将要发布的评论:</strong>
                                             <div class="mt-2">${comment.comment_text.replace(/\n/g, '<br>')}</div>
@@ -729,6 +806,52 @@ function showToast(type, message) {
     toastElement.addEventListener('hidden.bs.toast', () => {
         toastElement.remove();
     });
+}
+
+function renderCodeContext(context) {
+    if (!context) return '';
+
+    let html = '';
+
+    // 渲染前面的行
+    if (context.lines_before && context.lines_before.length > 0) {
+        context.lines_before.forEach(line => {
+            html += `<div class="code-line" style="color: #888;">`;
+            html += `<span class="line-number" style="color: #666; margin-right: 10px; min-width: 40px; display: inline-block;">${line.line_number}</span>`;
+            html += `<span class="line-content">${escapeHtml(line.content)}</span>`;
+            html += `</div>`;
+        });
+    }
+
+    // 渲染目标行（高亮显示）
+    if (context.target_line) {
+        html += `<div class="code-line target-line" style="background-color: #4a5568; color: #fff; font-weight: bold;">`;
+        html += `<span class="line-number" style="color: #f7fafc; margin-right: 10px; min-width: 40px; display: inline-block;">${context.target_line.line_number}</span>`;
+        html += `<span class="line-content">${escapeHtml(context.target_line.content)}</span>`;
+        html += `</div>`;
+    }
+
+    // 渲染后面的行
+    if (context.lines_after && context.lines_after.length > 0) {
+        context.lines_after.forEach(line => {
+            html += `<div class="code-line" style="color: #888;">`;
+            html += `<span class="line-number" style="color: #666; margin-right: 10px; min-width: 40px; display: inline-block;">${line.line_number}</span>`;
+            html += `<span class="line-content">${escapeHtml(line.content)}</span>`;
+            html += `</div>`;
+        });
+    }
+
+    return html;
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    return text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
 }
 </script>
 {% endblock %}
