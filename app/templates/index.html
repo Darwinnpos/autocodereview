@@ -818,7 +818,7 @@ async function toggleCodeContext(reviewId, issueId) {
             container.innerHTML = loadedContexts.get(issueId);
             toggleText.textContent = '隐藏代码';
             button.classList.remove('btn-outline-primary');
-            button.classList.add('btn-primary');
+            button.classList.add('btn-outline-success');
             button.disabled = false;
             return;
         }
@@ -838,7 +838,7 @@ async function toggleCodeContext(reviewId, issueId) {
                 container.innerHTML = contextHtml;
                 toggleText.textContent = '隐藏代码';
                 button.classList.remove('btn-outline-primary');
-                button.classList.add('btn-primary');
+                button.classList.add('btn-outline-success');
             } else {
                 container.innerHTML = `
                     <div class="alert alert-warning">
@@ -867,7 +867,7 @@ async function toggleCodeContext(reviewId, issueId) {
         // 隐藏代码上下文
         container.style.display = 'none';
         toggleText.textContent = '显示代码';
-        button.classList.remove('btn-primary');
+        button.classList.remove('btn-outline-success');
         button.classList.add('btn-outline-primary');
     }
 }
