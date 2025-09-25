@@ -539,10 +539,10 @@ class ReviewService:
                     self.logger.error(f"Review record not found for review_id: {review_id}")
                     return False
 
-                # 从数据库获取用户配置
-                user = self.auth_db.get_user_by_id(review['user_id'])
+                # 从数据库获取用户配置 (user_id存储的是用户名)
+                user = self.auth_db.get_user_by_username(review['user_id'])
                 if not user:
-                    self.logger.error(f"User not found for user_id: {review['user_id']}")
+                    self.logger.error(f"User not found for username: {review['user_id']}")
                     return False
 
                 if not user.gitlab_url or not user.access_token:
@@ -586,8 +586,8 @@ class ReviewService:
             if not review:
                 return {'success': False, 'error': '审查记录不存在'}
 
-            # 从数据库获取用户配置
-            user = self.auth_db.get_user_by_id(review['user_id'])
+            # 从数据库获取用户配置 (user_id存储的是用户名)
+            user = self.auth_db.get_user_by_username(review['user_id'])
             if not user:
                 return {'success': False, 'error': f'用户不存在: {review["user_id"]}'}
 
