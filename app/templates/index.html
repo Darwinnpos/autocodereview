@@ -577,7 +577,17 @@ async function loadPendingComments(reviewId) {
     }
 }
 
+// 全局变量用于分页
+let currentComments = [];
+let currentReviewId = null;
+let currentPage = 1;
+const pageSize = 5; // 每页显示5条评论
+
 function showPendingCommentsModal(comments, reviewId) {
+    currentComments = comments;
+    currentReviewId = reviewId;
+    currentPage = 1;
+
     const modalHtml = `
         <div class="modal fade" id="pendingCommentsModal" tabindex="-1">
             <div class="modal-dialog modal-xl">
@@ -594,62 +604,37 @@ function showPendingCommentsModal(comments, reviewId) {
                             <div>
                                 <button type="button" class="btn btn-success btn-sm" onclick="selectAllComments()">
                                     <i class="bi bi-check-all"></i>
-                                    全选
+                                    全选当前页
                                 </button>
                                 <button type="button" class="btn btn-outline-secondary btn-sm" onclick="clearAllSelections()">
                                     <i class="bi bi-x-square"></i>
                                     清空选择
                                 </button>
+                                <span class="text-muted ms-3" id="pageInfo">第 1 页，共 ${Math.ceil(comments.length / pageSize)} 页</span>
                             </div>
                             <button type="button" class="btn btn-primary" onclick="bulkConfirmComments(${reviewId})">
                                 <i class="bi bi-send"></i>
                                 批量确认选中的评论
                             </button>
                         </div>
+
+                        <!-- 分页导航 -->
+                        <nav aria-label="评论分页" class="mb-3">
+                            <ul class="pagination pagination-sm justify-content-center" id="paginationTop">
+                                <!-- 分页按钮将动态生成 -->
+                            </ul>
+                        </nav>
+
                         <div id="commentsContainer">
-                            ${comments.map(comment => `
-                                <div class="card mb-3 comment-card" data-issue-id="${comment.id}">
-                                    <div class="card-header d-flex justify-content-between align-items-center">
-                                        <div class="form-check">
-                                            <input class="form-check-input comment-checkbox" type="checkbox" value="${comment.id}">
-                                            <label class="form-check-label">
-                                                <strong>${comment.file_path}:${comment.line_number}</strong>
-                                                <span class="badge bg-${getSeverityColor(comment.severity)} ms-2">${comment.severity}</span>
-                                                <span class="badge bg-secondary ms-1">${comment.category}</span>
-                                            </label>
-                                        </div>
-                                        <div class="btn-group" role="group">
-                                            <button type="button" class="btn btn-success btn-sm" onclick="confirmSingleComment(${reviewId}, ${comment.id})">
-                                                <i class="bi bi-check"></i>
-                                                确认
-                                            </button>
-                                            <button type="button" class="btn btn-danger btn-sm" onclick="rejectSingleComment(${reviewId}, ${comment.id})">
-                                                <i class="bi bi-x"></i>
-                                                拒绝
-                                            </button>
-                                        </div>
-                                    </div>
-                                    <div class="card-body">
-                                        <p class="mb-2"><strong>问题:</strong> ${comment.message}</p>
-                                        <p class="mb-2"><strong>建议:</strong> ${comment.suggestion || '无'}</p>
-
-                                        ${comment.code_context ? `
-                                            <div class="mb-3">
-                                                <strong>代码上下文:</strong>
-                                                <div class="code-context mt-2 bg-dark text-white p-3 rounded" style="font-family: 'Courier New', monospace; font-size: 12px; overflow-x: auto;">
-                                                    ${renderCodeContext(comment.code_context)}
-                                                </div>
-                                            </div>
-                                        ` : ''}
-
-                                        <div class="bg-light p-3 rounded">
-                                            <strong>将要发布的评论:</strong>
-                                            <div class="mt-2">${comment.comment_text.replace(/\n/g, '<br>')}</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            `).join('')}
+                            <!-- 评论内容将动态加载 -->
                         </div>
+
+                        <!-- 底部分页导航 -->
+                        <nav aria-label="评论分页" class="mt-3">
+                            <ul class="pagination pagination-sm justify-content-center" id="paginationBottom">
+                                <!-- 分页按钮将动态生成 -->
+                            </ul>
+                        </nav>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
@@ -675,6 +660,136 @@ function showPendingCommentsModal(comments, reviewId) {
     // 显示modal
     const modal = new bootstrap.Modal(document.getElementById('pendingCommentsModal'));
     modal.show();
+
+    // 加载第一页评论
+    loadCommentsPage(1);
+}
+
+function loadCommentsPage(page) {
+    currentPage = page;
+    const startIndex = (page - 1) * pageSize;
+    const endIndex = Math.min(startIndex + pageSize, currentComments.length);
+    const pageComments = currentComments.slice(startIndex, endIndex);
+
+    // 生成当前页评论HTML
+    const commentsHtml = pageComments.map(comment => generateCommentHtml(comment, currentReviewId)).join('');
+
+    // 更新评论容器
+    document.getElementById('commentsContainer').innerHTML = commentsHtml;
+
+    // 更新页面信息
+    const totalPages = Math.ceil(currentComments.length / pageSize);
+    document.getElementById('pageInfo').textContent = `第 ${page} 页，共 ${totalPages} 页 (显示 ${startIndex + 1}-${endIndex} / ${currentComments.length})`;
+
+    // 更新分页按钮
+    updatePagination(page, totalPages);
+}
+
+function generateCommentHtml(comment, reviewId) {
+    return `
+        <div class="card mb-3 comment-card" data-issue-id="${comment.id}">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <div class="form-check">
+                    <input class="form-check-input comment-checkbox" type="checkbox" value="${comment.id}">
+                    <label class="form-check-label">
+                        <strong>${comment.file_path}:${comment.line_number}</strong>
+                        <span class="badge bg-${getSeverityColor(comment.severity)} ms-2">${comment.severity}</span>
+                        <span class="badge bg-secondary ms-1">${comment.category}</span>
+                    </label>
+                </div>
+                <div class="btn-group" role="group">
+                    <button type="button" class="btn btn-success btn-sm" onclick="confirmSingleComment(${reviewId}, ${comment.id})">
+                        <i class="bi bi-check"></i>
+                        确认
+                    </button>
+                    <button type="button" class="btn btn-danger btn-sm" onclick="rejectSingleComment(${reviewId}, ${comment.id})">
+                        <i class="bi bi-x"></i>
+                        拒绝
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <p class="mb-2"><strong>问题:</strong> ${comment.message}</p>
+                <p class="mb-2"><strong>建议:</strong> ${comment.suggestion || '无'}</p>
+
+                ${comment.code_context ? `
+                    <div class="mb-3">
+                        <strong>代码上下文:</strong>
+                        <div class="code-context mt-2 border rounded" style="font-family: 'Courier New', monospace; font-size: 13px; overflow-x: auto; background-color: white;">
+                            ${renderCodeContext(comment.code_context)}
+                        </div>
+                    </div>
+                ` : ''}
+
+                <div class="bg-light p-3 rounded">
+                    <strong>将要发布的评论:</strong>
+                    <div class="mt-2">${comment.comment_text.replace(/\n/g, '<br>')}</div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function updatePagination(currentPage, totalPages) {
+    const paginationHtml = generatePaginationHtml(currentPage, totalPages);
+    document.getElementById('paginationTop').innerHTML = paginationHtml;
+    document.getElementById('paginationBottom').innerHTML = paginationHtml;
+}
+
+function generatePaginationHtml(currentPage, totalPages) {
+    if (totalPages <= 1) return '';
+
+    let html = '';
+
+    // 上一页按钮
+    html += `<li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+        <a class="page-link" href="#" onclick="goToPage(${currentPage - 1})">上一页</a>
+    </li>`;
+
+    // 页码按钮（最多显示7个）
+    let startPage = Math.max(1, currentPage - 3);
+    let endPage = Math.min(totalPages, startPage + 6);
+
+    // 调整起始页
+    if (endPage - startPage < 6) {
+        startPage = Math.max(1, endPage - 6);
+    }
+
+    // 第一页
+    if (startPage > 1) {
+        html += `<li class="page-item"><a class="page-link" href="#" onclick="goToPage(1)">1</a></li>`;
+        if (startPage > 2) {
+            html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+        }
+    }
+
+    // 中间页码
+    for (let i = startPage; i <= endPage; i++) {
+        html += `<li class="page-item ${i === currentPage ? 'active' : ''}">
+            <a class="page-link" href="#" onclick="goToPage(${i})">${i}</a>
+        </li>`;
+    }
+
+    // 最后一页
+    if (endPage < totalPages) {
+        if (endPage < totalPages - 1) {
+            html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+        }
+        html += `<li class="page-item"><a class="page-link" href="#" onclick="goToPage(${totalPages})">${totalPages}</a></li>`;
+    }
+
+    // 下一页按钮
+    html += `<li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
+        <a class="page-link" href="#" onclick="goToPage(${currentPage + 1})">下一页</a>
+    </li>`;
+
+    return html;
+}
+
+function goToPage(page) {
+    const totalPages = Math.ceil(currentComments.length / pageSize);
+    if (page < 1 || page > totalPages) return;
+    loadCommentsPage(page);
 }
 
 function getSeverityColor(severity) {
@@ -687,13 +802,15 @@ function getSeverityColor(severity) {
 }
 
 function selectAllComments() {
-    document.querySelectorAll('.comment-checkbox').forEach(checkbox => {
+    // 只选择当前页显示的评论
+    document.querySelectorAll('#commentsContainer .comment-checkbox').forEach(checkbox => {
         checkbox.checked = true;
     });
 }
 
 function clearAllSelections() {
-    document.querySelectorAll('.comment-checkbox').forEach(checkbox => {
+    // 清除所有页面的选择（包括已确认但不在当前页的）
+    document.querySelectorAll('#commentsContainer .comment-checkbox').forEach(checkbox => {
         checkbox.checked = false;
     });
 }
@@ -811,37 +928,43 @@ function showToast(type, message) {
 function renderCodeContext(context) {
     if (!context) return '';
 
-    let html = '';
+    // 使用数组拼接而非字符串连接，提高性能
+    const lines = [];
 
-    // 渲染前面的行
+    // 渲染前面的行（白底灰色文字）
     if (context.lines_before && context.lines_before.length > 0) {
         context.lines_before.forEach(line => {
-            html += `<div class="code-line" style="color: #888;">`;
-            html += `<span class="line-number" style="color: #666; margin-right: 10px; min-width: 40px; display: inline-block;">${line.line_number}</span>`;
-            html += `<span class="line-content">${escapeHtml(line.content)}</span>`;
-            html += `</div>`;
+            lines.push(`<div class="code-line context-line" style="background-color: white; color: #495057; padding: 4px 12px; border-left: 2px solid #dee2e6; line-height: 1.4;">
+                <span class="line-number" style="color: #6c757d; margin-right: 16px; min-width: 45px; display: inline-block; font-family: 'Consolas', 'Monaco', monospace; text-align: right;">${line.line_number}</span>
+                <span class="line-content" style="font-family: 'Consolas', 'Monaco', 'Courier New', monospace; white-space: pre; tab-size: 4;">${preserveSpaces(escapeHtml(line.content))}</span>
+            </div>`);
         });
     }
 
-    // 渲染目标行（高亮显示）
+    // 渲染目标行（红色左边框表示问题行）
     if (context.target_line) {
-        html += `<div class="code-line target-line" style="background-color: #4a5568; color: #fff; font-weight: bold;">`;
-        html += `<span class="line-number" style="color: #f7fafc; margin-right: 10px; min-width: 40px; display: inline-block;">${context.target_line.line_number}</span>`;
-        html += `<span class="line-content">${escapeHtml(context.target_line.content)}</span>`;
-        html += `</div>`;
+        lines.push(`<div class="code-line target-line" style="background-color: #fff5f5; color: #d63384; padding: 4px 12px; border-left: 4px solid #dc3545; line-height: 1.4; font-weight: 500;">
+            <span class="line-number" style="color: #dc3545; margin-right: 16px; min-width: 45px; display: inline-block; font-family: 'Consolas', 'Monaco', monospace; text-align: right; font-weight: bold;">${context.target_line.line_number}</span>
+            <span class="line-content" style="font-family: 'Consolas', 'Monaco', 'Courier New', monospace; white-space: pre; tab-size: 4;">${preserveSpaces(escapeHtml(context.target_line.content))}</span>
+        </div>`);
     }
 
-    // 渲染后面的行
+    // 渲染后面的行（白底灰色文字）
     if (context.lines_after && context.lines_after.length > 0) {
         context.lines_after.forEach(line => {
-            html += `<div class="code-line" style="color: #888;">`;
-            html += `<span class="line-number" style="color: #666; margin-right: 10px; min-width: 40px; display: inline-block;">${line.line_number}</span>`;
-            html += `<span class="line-content">${escapeHtml(line.content)}</span>`;
-            html += `</div>`;
+            lines.push(`<div class="code-line context-line" style="background-color: white; color: #495057; padding: 4px 12px; border-left: 2px solid #dee2e6; line-height: 1.4;">
+                <span class="line-number" style="color: #6c757d; margin-right: 16px; min-width: 45px; display: inline-block; font-family: 'Consolas', 'Monaco', monospace; text-align: right;">${line.line_number}</span>
+                <span class="line-content" style="font-family: 'Consolas', 'Monaco', 'Courier New', monospace; white-space: pre; tab-size: 4;">${preserveSpaces(escapeHtml(line.content))}</span>
+            </div>`);
         });
     }
 
-    return html;
+    return lines.join('');
+}
+
+function preserveSpaces(text) {
+    // 保留原始空格和制表符
+    return text.replace(/ /g, ' ').replace(/\t/g, '    ');
 }
 
 function escapeHtml(text) {
