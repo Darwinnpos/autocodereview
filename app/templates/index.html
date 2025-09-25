@@ -552,9 +552,9 @@ document.getElementById('validateBtn').addEventListener('click', async function(
         });
 
         if (response.data.data.valid) {
-            alert('✅ URL格式正确');
+            alert('URL格式正确');
         } else {
-            alert('❌ ' + response.data.data.error);
+            alert(response.data.data.error);
         }
     } catch (error) {
         alert('验证失败: ' + (error.response?.data?.error || error.message));

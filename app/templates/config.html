@@ -363,7 +363,7 @@ document.getElementById('loadBtn').addEventListener('click', async function() {
             });
         }
 
-        alert('✅ 配置加载成功');
+        alert('配置加载成功');
     } catch (error) {
         alert('加载失败: ' + (error.response?.data?.error || error.message));
     } finally {
@@ -390,9 +390,9 @@ document.getElementById('testBtn').addEventListener('click', async function() {
         });
 
         if (response.data.data.connected) {
-            alert('✅ GitLab连接测试成功');
+            alert('GitLab连接测试成功');
         } else {
-            alert('❌ 连接失败: ' + response.data.data.error);
+            alert('连接失败: ' + response.data.data.error);
         }
     } catch (error) {
         alert('测试失败: ' + (error.response?.data?.error || error.message));
@@ -425,7 +425,7 @@ document.getElementById('exportBtn').addEventListener('click', async function() 
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
 
-        alert('✅ 配置导出成功');
+        alert('配置导出成功');
     } catch (error) {
         alert('导出失败: ' + (error.response?.data?.error || error.message));
     }

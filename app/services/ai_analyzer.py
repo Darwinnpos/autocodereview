@@ -87,26 +87,32 @@ class AICodeAnalyzer:
             context.file_content, context.changed_lines
         )
 
-        prompt = f"""你是一个专业的代码审查专家。请分析以下代码变更，重点关注修改的部分。
+        prompt = f"""你是一个专业的代码审查专家。请分析以下代码变更，重点关注新增和修改的部分。
 
 **文件路径**: {context.file_path}
 **编程语言**: {context.language}
 **MR标题**: {context.mr_title}
 
-**完整源代码**:
+**修改后的完整源代码** (当前版本):
 ```{context.language}
 {context.file_content}
 ```
 
-**变更内容(diff)**:
+**代码变更差异(diff)** (显示从旧版本到新版本的变化):
 ```diff
 {context.diff_content}
 ```
 
-**变更的代码行** (第{', '.join(map(str, context.changed_lines))}行):
+**新增/修改的代码行** (第{', '.join(map(str, context.changed_lines))}行，这些是修改后的新代码):
 {changed_code_snippets}
 
-请从以下维度分析代码：
+**重要说明**:
+- 上述"完整源代码"是修改**后**的版本（即当前最新代码）
+- "代码变更差异"中以"+"开头的行是新增/修改**后**的代码
+- "代码变更差异"中以"-"开头的行是删除/修改**前**的代码
+- 请重点分析新增/修改后的代码（即"+"开头的行对应的内容）
+
+请从以下维度分析新增/修改后的代码：
 
 1. **安全性 (Security)**:
    - SQL注入、XSS、CSRF等安全漏洞
@@ -136,7 +142,10 @@ class AICodeAnalyzer:
    - 边界条件处理
    - 逻辑漏洞
 
-**重要**: 只分析变更的行及其直接相关的上下文，不要分析整个文件。
+**分析要求**:
+- 只分析新增/修改的代码行及其直接相关的上下文
+- 重点关注修改后的代码可能存在的问题
+- 不要分析整个文件，只关注变更部分
 
 请以JSON格式返回分析结果，格式如下：
 ```json
@@ -145,8 +154,8 @@ class AICodeAnalyzer:
     "line_number": 行号,
     "severity": "error|warning|info",
     "category": "security|performance|quality|best_practices|logic",
-    "message": "问题描述",
-    "suggestion": "具体的修改建议",
+    "message": "问题描述（描述修改后代码的问题）",
+    "suggestion": "具体的修改建议（针对当前修改后的代码）",
     "confidence": 0.8
   }}
 ]
@@ -154,9 +163,10 @@ class AICodeAnalyzer:
 
 要求：
 - 只返回JSON，不要其他文字
-- line_number必须是变更行中的一个
+- line_number必须是新增/修改行中的一个
 - severity: error(严重问题), warning(潜在问题), info(建议优化)
 - confidence: 0.0-1.0，表示问题的确信度
+- message和suggestion都应该针对修改**后**的代码
 - 如果没有问题，返回空数组[]
 """
 
@@ -175,10 +185,14 @@ class AICodeAnalyzer:
 
                 context_lines = []
                 for i in range(start, end):
-                    marker = ">>> " if i + 1 == line_num else "    "
+                    if i + 1 == line_num:
+                        # 标记这是新增/修改后的代码行
+                        marker = ">>> [新增/修改] "
+                    else:
+                        marker = "    "
                     context_lines.append(f"{marker}{i + 1}: {lines[i]}")
 
-                snippets.append(f"变更行 {line_num}:\n" + "\n".join(context_lines))
+                snippets.append(f"修改后的代码行 {line_num} (当前版本):\n" + "\n".join(context_lines))
 
         return "\n\n".join(snippets)
 

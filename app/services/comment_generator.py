@@ -23,31 +23,31 @@ class CommentGenerator:
             CommentTemplate(
                 category='security',
                 severity='error',
-                template='🚨 **安全风险**: {message}\n\n**建议**: {suggestion}',
+                template='**安全风险**: {message}\n\n**建议**: {suggestion}',
                 priority=1
             ),
             CommentTemplate(
                 category='syntax',
                 severity='error',
-                template='❌ **语法错误**: {message}\n\n**建议**: {suggestion}',
+                template='**语法错误**: {message}\n\n**建议**: {suggestion}',
                 priority=1
             ),
             CommentTemplate(
                 category='performance',
                 severity='warning',
-                template='⚡ **性能优化**: {message}\n\n**建议**: {suggestion}',
+                template='**性能优化**: {message}\n\n**建议**: {suggestion}',
                 priority=3
             ),
             CommentTemplate(
                 category='style',
                 severity='info',
-                template='🎨 **代码风格**: {message}\n\n**建议**: {suggestion}',
+                template='**代码风格**: {message}\n\n**建议**: {suggestion}',
                 priority=5
             ),
             CommentTemplate(
                 category='general',
                 severity='info',
-                template='📝 **代码审查**: {message}\n\n**建议**: {suggestion}',
+                template='**代码审查**: {message}\n\n**建议**: {suggestion}',
                 priority=5
             )
         ]
@@ -111,10 +111,10 @@ class CommentGenerator:
     def generate_summary_comment(self, issues: List[CodeIssue]) -> str:
         """生成代码审查总结评论"""
         if not issues:
-            return "## ✅ 代码审查通过\n\n🎉 恭喜！本次代码审查未发现明显问题。"
+            return "## 代码审查通过\n\n本次代码审查未发现明显问题。"
 
         summary_parts = [
-            "## 📋 代码审查总结",
+            "## 代码审查总结",
             "",
             f"本次审查共发现 **{len(issues)}** 个问题："
         ]
@@ -138,10 +138,10 @@ class CommentGenerator:
                 info_count += 1
 
         if error_count > 0:
-            summary_parts.append(f"- ❌ 错误: {error_count} 个")
+            summary_parts.append(f"- 错误: {error_count} 个")
         if warning_count > 0:
-            summary_parts.append(f"- ⚠️ 警告: {warning_count} 个")
+            summary_parts.append(f"- 警告: {warning_count} 个")
         if info_count > 0:
-            summary_parts.append(f"- 💡 建议: {info_count} 个")
+            summary_parts.append(f"- 建议: {info_count} 个")
 
         return "\n".join(summary_parts)
