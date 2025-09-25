@@ -519,9 +519,13 @@ class ReviewService:
         """导出审查数据"""
         return self.db.export_review_data(review_id)
 
-    def get_pending_comments(self, review_id: int) -> List[Dict]:
-        """获取待确认的评论（包含代码上下文）"""
+    def get_pending_comments(self, review_id: int, include_context: bool = False) -> List[Dict]:
+        """获取待确认的评论"""
         pending_comments = self.db.get_pending_comments(review_id)
+
+        # 如果不需要代码上下文，直接返回
+        if not include_context:
+            return pending_comments
 
         # 获取审查信息以获取项目路径
         review = self.db.get_review_record(review_id)
@@ -543,6 +547,30 @@ class ReviewService:
                 comment['code_context'] = None
 
         return pending_comments
+
+    def get_comment_code_context(self, review_id: int, issue_id: int) -> Dict:
+        """获取单个评论的代码上下文"""
+        try:
+            # 获取问题详情
+            issue = self._get_issue_by_id(issue_id)
+            if not issue or issue['review_id'] != review_id:
+                return None
+
+            # 获取审查信息
+            review = self.db.get_review_record(review_id)
+            if not review:
+                return None
+
+            # 获取代码上下文
+            return self._get_code_context_for_review(
+                review,
+                issue['file_path'],
+                issue['line_number']
+            )
+
+        except Exception as e:
+            self.logger.error(f"Error getting code context for comment {issue_id}: {e}")
+            return None
 
     def _get_code_context_for_review(self, review: Dict, file_path: str, line_number: int, context_lines: int = 5) -> Dict:
         """为指定审查获取代码上下文"""

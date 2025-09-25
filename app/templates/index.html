@@ -709,17 +709,26 @@ function generateCommentHtml(comment, reviewId) {
                 </div>
             </div>
             <div class="card-body">
-                <p class="mb-2"><strong>问题:</strong> ${comment.message}</p>
-                <p class="mb-2"><strong>建议:</strong> ${comment.suggestion || '无'}</p>
-
-                ${comment.code_context ? `
-                    <div class="mb-3">
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center">
                         <strong>代码上下文:</strong>
-                        <div class="code-context mt-2 border rounded" style="font-family: 'Courier New', monospace; font-size: 13px; overflow-x: auto; background-color: white;">
-                            ${renderCodeContext(comment.code_context)}
+                        <button class="btn btn-outline-primary btn-sm" onclick="toggleCodeContext(${reviewId}, ${comment.id})">
+                            <i class="bi bi-code-slash"></i>
+                            <span class="toggle-text">显示代码</span>
+                        </button>
+                    </div>
+                    <div class="code-context-container mt-2" id="context-${comment.id}" style="display: none;">
+                        <div class="text-center p-3">
+                            <div class="spinner-border spinner-border-sm" role="status">
+                                <span class="visually-hidden">加载中...</span>
+                            </div>
+                            <div class="mt-2 text-muted">正在加载代码上下文...</div>
                         </div>
                     </div>
-                ` : ''}
+                </div>
+
+                <p class="mb-2"><strong>问题:</strong> ${comment.message}</p>
+                <p class="mb-2"><strong>建议:</strong> ${comment.suggestion || '无'}</p>
 
             </div>
         </div>
@@ -786,6 +795,72 @@ function goToPage(page) {
     const totalPages = Math.ceil(currentComments.length / pageSize);
     if (page < 1 || page > totalPages) return;
     loadCommentsPage(page);
+}
+
+// 存储已加载的代码上下文
+const loadedContexts = new Map();
+
+async function toggleCodeContext(reviewId, issueId) {
+    const container = document.getElementById(`context-${issueId}`);
+    const button = container.parentElement.querySelector('button');
+    const toggleText = button.querySelector('.toggle-text');
+
+    if (container.style.display === 'none') {
+        // 显示代码上下文
+        container.style.display = 'block';
+        button.disabled = true;
+
+        // 检查是否已经加载过
+        if (loadedContexts.has(issueId)) {
+            container.innerHTML = loadedContexts.get(issueId);
+            toggleText.textContent = '隐藏代码';
+            button.disabled = false;
+            return;
+        }
+
+        try {
+            const response = await axios.get(`/api/review/${reviewId}/comment/${issueId}/context`);
+
+            if (response.data.success) {
+                const contextHtml = `
+                    <div class="border rounded" style="font-family: 'Courier New', monospace; font-size: 13px; overflow-x: auto; background-color: white;">
+                        ${renderCodeContext(response.data.data.context)}
+                    </div>
+                `;
+
+                // 缓存已加载的内容
+                loadedContexts.set(issueId, contextHtml);
+                container.innerHTML = contextHtml;
+                toggleText.textContent = '隐藏代码';
+            } else {
+                container.innerHTML = `
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        无法加载代码上下文：${response.data.error || '未知错误'}
+                    </div>
+                `;
+                toggleText.textContent = '重试加载';
+            }
+        } catch (error) {
+            console.error('Failed to load code context:', error);
+            container.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="bi bi-x-circle"></i>
+                    加载失败：${error.response?.data?.error || error.message || '网络错误'}
+                    <button class="btn btn-sm btn-outline-danger ms-2" onclick="toggleCodeContext(${reviewId}, ${issueId})">
+                        重试
+                    </button>
+                </div>
+            `;
+            toggleText.textContent = '重试加载';
+        } finally {
+            button.disabled = false;
+        }
+    } else {
+        // 隐藏代码上下文
+        container.style.display = 'none';
+        toggleText.textContent = '显示代码';
+    }
 }
 
 function getSeverityColor(severity) {

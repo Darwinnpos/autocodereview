@@ -318,7 +318,8 @@ def test_gitlab_connection():
 def get_pending_comments(review_id: int):
     """获取待确认的评论"""
     try:
-        pending_comments = review_service.get_pending_comments(review_id)
+        # 不包含代码上下文，快速返回基本信息
+        pending_comments = review_service.get_pending_comments(review_id, include_context=False)
 
         return jsonify({
             'success': True,
@@ -331,6 +332,28 @@ def get_pending_comments(review_id: int):
 
     except Exception as e:
         logger.error(f"Error in get_pending_comments: {e}")
+        return jsonify({'error': '服务器内部错误'}), 500
+
+
+@bp.route('/review/<int:review_id>/comment/<int:issue_id>/context', methods=['GET'])
+def get_comment_context(review_id: int, issue_id: int):
+    """获取单个评论的代码上下文"""
+    try:
+        context = review_service.get_comment_code_context(review_id, issue_id)
+
+        if context is None:
+            return jsonify({'error': '无法获取代码上下文'}), 404
+
+        return jsonify({
+            'success': True,
+            'data': {
+                'issue_id': issue_id,
+                'context': context
+            }
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Error in get_comment_context: {e}")
         return jsonify({'error': '服务器内部错误'}), 500
 
 
