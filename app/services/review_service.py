@@ -22,6 +22,9 @@ class ReviewService:
         # 进度跟踪存储 (内存中临时存储)
         self._progress_storage = {}
         self._progress_lock = threading.Lock()
+        # 用于跟踪可取消的审查进程
+        self._cancellation_flags = {}
+        self._cancellation_lock = threading.Lock()
 
     def _setup_logger(self) -> logging.Logger:
         """设置日志记录器"""
@@ -138,6 +141,11 @@ class ReviewService:
     def perform_review(self, username: str, mr_url: str, review_id: int = None) -> Dict:
         """执行完整的代码审查流程"""
         try:
+            # 初始化取消标志
+            if review_id:
+                with self._cancellation_lock:
+                    self._cancellation_flags[review_id] = False
+
             # 1. 获取用户信息（重新获取以确保是最新配置）
             self.logger.info(f"Starting code review for user {username}, MR: {mr_url}")
             user = self.auth_db.get_user_by_username(username)
@@ -288,6 +296,17 @@ class ReviewService:
 
             processed_files = 0
             for change in changes:
+                # 检查是否被取消
+                if self._is_review_cancelled(review_id):
+                    self.logger.info(f"Review {review_id} was cancelled, stopping analysis")
+                    self.db.cancel_review_record(review_id, "用户手动取消")
+                    return {
+                        'success': False,
+                        'error': '审查已被用户取消',
+                        'error_code': 'CANCELLED_BY_USER',
+                        'review_id': review_id
+                    }
+
                 if change.get('deleted_file', False):
                     continue  # 跳过已删除的文件
 
@@ -1053,3 +1072,50 @@ class ReviewService:
         self.db.delete_review_progress(review_id)
 
         return result
+
+    def cancel_review(self, review_id: int) -> bool:
+        """取消正在进行的审查"""
+        try:
+            # 获取审查记录
+            review = self.db.get_review_record(review_id)
+            if not review:
+                self.logger.error(f"Review {review_id} not found for cancellation")
+                return False
+
+            # 检查状态是否允许取消
+            if review['status'] in ['completed', 'failed', 'cancelled']:
+                self.logger.warning(f"Cannot cancel review {review_id} with status {review['status']}")
+                return False
+
+            # 设置取消标志
+            with self._cancellation_lock:
+                self._cancellation_flags[review_id] = True
+
+            # 更新数据库状态
+            success = self.db.cancel_review_record(review_id, "用户手动取消")
+
+            if success:
+                # 清理进度记录
+                self.db.delete_review_progress(review_id)
+                self.logger.info(f"Review {review_id} successfully cancelled")
+
+                # 清理取消标志
+                with self._cancellation_lock:
+                    self._cancellation_flags.pop(review_id, None)
+
+                return True
+            else:
+                self.logger.error(f"Failed to cancel review {review_id} in database")
+                return False
+
+        except Exception as e:
+            self.logger.error(f"Error cancelling review {review_id}: {e}")
+            return False
+
+    def _is_review_cancelled(self, review_id: int) -> bool:
+        """检查审查是否被取消"""
+        if not review_id:
+            return False
+
+        with self._cancellation_lock:
+            return self._cancellation_flags.get(review_id, False)

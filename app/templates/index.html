@@ -76,6 +76,14 @@
                         正在分析: <span id="currentFileName" class="text-primary"></span>
                     </div>
                 </div>
+
+                <!-- 取消按钮 -->
+                <div class="mt-3">
+                    <button type="button" class="btn btn-outline-danger btn-sm" id="cancelReviewBtn">
+                        <i class="bi bi-x-circle"></i>
+                        取消审查
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -167,6 +175,7 @@
 // Debug version - v1.0.2
 // 全局变量
 let reviewProgressInterval = null;
+let currentReviewIdForCancel = null;
 
 document.getElementById('reviewForm').addEventListener('submit', async function(e) {
     e.preventDefault();
@@ -201,6 +210,8 @@ document.getElementById('reviewForm').addEventListener('submit', async function(
             console.log('Starting progress polling for review ID:', reviewId);
 
             if (reviewId) {
+                // 保存当前审查ID用于取消功能
+                currentReviewIdForCancel = reviewId;
                 // 开始轮询进度
                 startProgressPolling(reviewId);
             } else {
@@ -290,10 +301,18 @@ function startProgressPolling(reviewId) {
                 // 只更新文件计数和进度条，不频繁更新按钮状态
                 updateProgressCounts(progress);
 
-                // 如果审查完成，停止轮询并显示结果
-                if (progress.status === 'completed' || progress.status === 'failed') {
+                // 如果审查完成、失败或被取消，停止轮询并显示结果
+                if (progress.status === 'completed' || progress.status === 'failed' || progress.status === 'cancelled') {
                     clearInterval(reviewProgressInterval);
-                    showFinalResult(reviewId);
+                    reviewProgressInterval = null;
+                    currentReviewIdForCancel = null;
+
+                    if (progress.status === 'cancelled') {
+                        // 处理取消状态
+                        handleCancelledReview();
+                    } else {
+                        showFinalResult(reviewId);
+                    }
                 }
             } else {
                 console.error('Progress API returned error:', response.data);
@@ -314,7 +333,8 @@ function updateProgressCounts(progress) {
         'generating_comments': '正在生成评论...',
         'saving_results': '正在保存结果...',
         'completed': '分析完成！',
-        'failed': '分析失败'
+        'failed': '分析失败',
+        'cancelled': '已取消'
     };
     const statusText = statusTexts[progress.status] || progress.status;
     document.getElementById('progressStatus').textContent = statusText;
@@ -371,7 +391,8 @@ function updateProgress(progress) {
         'generating_comments': '正在生成评论...',
         'saving_results': '正在保存结果...',
         'completed': '分析完成！',
-        'failed': '分析失败'
+        'failed': '分析失败',
+        'cancelled': '已取消'
     };
     const statusText = statusTexts[progress.status] || progress.status;
     console.log('Setting status text to:', statusText);
@@ -1056,5 +1077,95 @@ function escapeHtml(text) {
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#39;");
 }
+
+function handleCancelledReview() {
+    const submitBtn = document.querySelector('button[type="submit"]');
+    const progressCard = document.getElementById('progressCard');
+    const resultCard = document.getElementById('resultCard');
+    const resultContent = document.getElementById('resultContent');
+
+    // 隐藏进度卡片
+    progressCard.style.display = 'none';
+
+    // 显示取消结果
+    resultContent.innerHTML = `
+        <div class="alert alert-warning">
+            <h6><i class="bi bi-x-circle"></i> 审查已取消</h6>
+            <p class="mb-1">代码审查已被取消</p>
+            <p class="mb-0">您可以随时重新开始审查</p>
+        </div>
+    `;
+    resultCard.style.display = 'block';
+
+    // 重置表单状态
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = '<i class="bi bi-play"></i> 开始审查';
+}
+
+// 取消审查功能
+document.getElementById('cancelReviewBtn').addEventListener('click', async function() {
+    if (!currentReviewIdForCancel) {
+        alert('没有正在进行的审查可以取消');
+        return;
+    }
+
+    if (!confirm('确定要取消当前的代码审查吗？\n取消后将无法恢复已分析的数据。')) {
+        return;
+    }
+
+    const cancelBtn = this;
+    const originalText = cancelBtn.innerHTML;
+
+    // 显示取消中状态
+    cancelBtn.disabled = true;
+    cancelBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> 取消中...';
+
+    try {
+        const response = await axios.post(`/api/review/${currentReviewIdForCancel}/cancel`);
+
+        if (response.data.success) {
+            // 停止进度轮询
+            if (reviewProgressInterval) {
+                clearInterval(reviewProgressInterval);
+                reviewProgressInterval = null;
+            }
+
+            // 隐藏进度卡片
+            document.getElementById('progressCard').style.display = 'none';
+
+            // 显示取消结果
+            const resultCard = document.getElementById('resultCard');
+            const resultContent = document.getElementById('resultContent');
+
+            resultContent.innerHTML = `
+                <div class="alert alert-warning">
+                    <h6><i class="bi bi-x-circle"></i> 审查已取消</h6>
+                    <p class="mb-1">代码审查已被用户主动取消</p>
+                    <p class="mb-0">您可以随时重新开始审查</p>
+                </div>
+            `;
+            resultCard.style.display = 'block';
+
+            // 重置表单
+            const submitBtn = document.querySelector('button[type="submit"]');
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="bi bi-play"></i> 开始审查';
+
+            // 清理全局状态
+            currentReviewIdForCancel = null;
+
+            showToast('success', '审查已成功取消');
+        } else {
+            throw new Error(response.data.error || '取消失败');
+        }
+    } catch (error) {
+        const errorMessage = error.response?.data?.error || error.message;
+        showToast('error', '取消审查失败: ' + errorMessage);
+    } finally {
+        // 恢复取消按钮状态
+        cancelBtn.disabled = false;
+        cancelBtn.innerHTML = originalText;
+    }
+});
 </script>
 {% endblock %}

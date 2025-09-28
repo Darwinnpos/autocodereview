@@ -462,6 +462,49 @@ def get_review_result(review_id: int):
         return jsonify({'error': '服务器内部错误'}), 500
 
 
+@bp.route('/review/<int:review_id>/cancel', methods=['POST'])
+def cancel_review(review_id: int):
+    """取消/中止代码审查"""
+    try:
+        # 检查用户登录状态
+        user_id = session.get('user_id')
+        if not user_id:
+            return jsonify({'error': '请先登录'}), 401
+
+        # 获取当前用户信息
+        user = auth_db.get_user_by_id(user_id)
+        if not user:
+            return jsonify({'error': '用户不存在'}), 404
+
+        # 验证审查记录是否存在且属于当前用户
+        review = review_service.db.get_review_record(review_id)
+        if not review:
+            return jsonify({'error': '审查记录不存在'}), 404
+
+        # 检查审查记录是否属于当前用户
+        if review['user_id'] != user.username:
+            return jsonify({'error': '无权限操作此审查记录'}), 403
+
+        # 检查审查状态是否可以取消
+        if review['status'] in ['completed', 'failed', 'cancelled']:
+            return jsonify({'error': f'无法取消已{review["status"]}的审查'}), 400
+
+        # 执行取消操作
+        success = review_service.cancel_review(review_id)
+
+        if success:
+            return jsonify({
+                'success': True,
+                'message': '审查已成功取消'
+            }), 200
+        else:
+            return jsonify({'error': '取消审查失败'}), 400
+
+    except Exception as e:
+        logger.error(f"Error in cancel_review: {e}")
+        return jsonify({'error': '服务器内部错误'}), 500
+
+
 @bp.route('/system/stats', methods=['GET'])
 def get_system_stats():
     """获取系统统计信息（管理员）"""

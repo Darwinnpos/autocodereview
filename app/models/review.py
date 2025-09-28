@@ -149,6 +149,29 @@ class ReviewDatabase:
         conn.commit()
         conn.close()
 
+    def cancel_review_record(self, review_id: int, reason: str = "用户取消") -> bool:
+        """取消审查记录"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+
+            cursor.execute('''
+                UPDATE reviews SET
+                    status = 'cancelled',
+                    error_message = ?,
+                    completed_at = ?
+                WHERE id = ? AND status NOT IN ('completed', 'failed', 'cancelled')
+            ''', (reason, datetime.now().isoformat(), review_id))
+
+            rows_affected = cursor.rowcount
+            conn.commit()
+            conn.close()
+
+            return rows_affected > 0
+        except Exception as e:
+            print(f"Error cancelling review record: {e}")
+            return False
+
     def add_issue_record(self, review_id: int, issue_data: Dict) -> int:
         """添加问题记录"""
         conn = sqlite3.connect(self.db_path)
