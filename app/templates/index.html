@@ -212,6 +212,20 @@ document.getElementById('reviewForm').addEventListener('submit', async function(
             if (reviewId) {
                 // 保存当前审查ID用于取消功能
                 currentReviewIdForCancel = reviewId;
+
+                // 锁定页面，防止用户意外离开
+                lockPage(
+                    '代码审查正在进行中，离开页面将中断审查过程',
+                    function() { // 用户确认离开时的回调
+                        console.log('用户确认取消审查并离开页面');
+                        // 尝试取消审查
+                        cancelCurrentReview();
+                    },
+                    function() { // 用户取消离开时的回调
+                        console.log('用户取消离开页面，继续审查');
+                    }
+                );
+
                 // 开始轮询进度
                 startProgressPolling(reviewId);
             } else {
@@ -222,6 +236,9 @@ document.getElementById('reviewForm').addEventListener('submit', async function(
             throw new Error(response.data.error || '审查失败');
         }
     } catch (error) {
+        // 解锁页面
+        unlockPage();
+
         // 隐藏进度卡片，显示详细错误
         progressCard.style.display = 'none';
 
@@ -306,6 +323,9 @@ function startProgressPolling(reviewId) {
                     clearInterval(reviewProgressInterval);
                     reviewProgressInterval = null;
                     currentReviewIdForCancel = null;
+
+                    // 解锁页面
+                    unlockPage();
 
                     if (progress.status === 'cancelled') {
                         // 处理取消状态
@@ -550,6 +570,9 @@ async function showFinalResult(reviewId) {
         `;
         resultCard.style.display = 'block';
     } finally {
+        // 解锁页面
+        unlockPage();
+
         submitBtn.disabled = false;
         submitBtn.innerHTML = '<i class="bi bi-play"></i> 开始审查';
     }
@@ -1102,6 +1125,32 @@ function handleCancelledReview() {
     submitBtn.innerHTML = '<i class="bi bi-play"></i> 开始审查';
 }
 
+// 取消当前审查的函数
+async function cancelCurrentReview() {
+    if (!currentReviewIdForCancel) {
+        console.log('No review to cancel');
+        return;
+    }
+
+    try {
+        const response = await axios.post(`/api/review/${currentReviewIdForCancel}/cancel`);
+        if (response.data.success) {
+            console.log('Review successfully cancelled');
+
+            // 停止进度轮询
+            if (reviewProgressInterval) {
+                clearInterval(reviewProgressInterval);
+                reviewProgressInterval = null;
+            }
+
+            // 清理全局状态
+            currentReviewIdForCancel = null;
+        }
+    } catch (error) {
+        console.error('Failed to cancel review:', error);
+    }
+}
+
 // 取消审查功能
 document.getElementById('cancelReviewBtn').addEventListener('click', async function() {
     if (!currentReviewIdForCancel) {
@@ -1153,6 +1202,9 @@ document.getElementById('cancelReviewBtn').addEventListener('click', async funct
 
             // 清理全局状态
             currentReviewIdForCancel = null;
+
+            // 解锁页面
+            unlockPage();
 
             showToast('success', '审查已成功取消');
         } else {

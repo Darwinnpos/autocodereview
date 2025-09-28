@@ -43,6 +43,54 @@
         .chart-container canvas {
             max-height: 100% !important;
         }
+
+        /* 页面锁定时的样式 */
+        .nav-link.page-locked {
+            pointer-events: none !important;
+            opacity: 0.5 !important;
+            cursor: not-allowed !important;
+        }
+
+        .navbar-brand.page-locked {
+            pointer-events: none !important;
+            opacity: 0.5 !important;
+            cursor: not-allowed !important;
+        }
+
+        .dropdown-toggle.page-locked {
+            pointer-events: none !important;
+            opacity: 0.5 !important;
+            cursor: not-allowed !important;
+        }
+
+        .dropdown-menu.page-locked {
+            pointer-events: none !important;
+            opacity: 0.5 !important;
+        }
+
+        .dropdown-item.page-locked {
+            pointer-events: none !important;
+            opacity: 0.5 !important;
+            cursor: not-allowed !important;
+        }
+
+        /* 页面锁定提示 */
+        .page-lock-notice {
+            position: fixed;
+            top: 70px;
+            right: 20px;
+            background: #17a2b8;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 4px;
+            font-size: 14px;
+            z-index: 1050;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+
+        .page-lock-notice .btn-close {
+            filter: invert(1);
+        }
     </style>
     {% block styles %}{% endblock %}
 </head>
@@ -121,6 +169,12 @@
     <script>
     // 全局会话管理
     let currentUser = null;
+
+    // 全局页面锁定状态
+    let isPageLocked = false;
+    let lockReason = '';
+    let onConfirmCallback = null;
+    let onCancelCallback = null;
 
     // 页面加载时检查登录状态
     document.addEventListener('DOMContentLoaded', function() {
@@ -214,6 +268,216 @@
         }
         return true;
     }
+
+    // 页面锁定功能
+    function lockPage(reason, onConfirm, onCancel) {
+        isPageLocked = true;
+        lockReason = reason || '页面正在处理重要操作';
+        onConfirmCallback = onConfirm;
+        onCancelCallback = onCancel;
+
+        // 添加视觉提示
+        updateNavigationState();
+
+        // 监听页面离开事件
+        window.addEventListener('beforeunload', handleBeforeUnload);
+    }
+
+    function unlockPage() {
+        isPageLocked = false;
+        lockReason = '';
+        onConfirmCallback = null;
+        onCancelCallback = null;
+
+        // 移除视觉提示
+        updateNavigationState();
+
+        // 移除页面离开监听
+        window.removeEventListener('beforeunload', handleBeforeUnload);
+    }
+
+    function handleBeforeUnload(event) {
+        if (isPageLocked) {
+            event.preventDefault();
+            event.returnValue = lockReason;
+            return lockReason;
+        }
+    }
+
+    function updateNavigationState() {
+        const navLinks = document.querySelectorAll('.nav-link:not(.dropdown-toggle)');
+        const brandLink = document.querySelector('.navbar-brand');
+        const dropdownToggle = document.querySelector('.dropdown-toggle');
+        const dropdownMenu = document.querySelector('.dropdown-menu');
+        const dropdownItems = document.querySelectorAll('.dropdown-item');
+
+        if (isPageLocked) {
+            // 禁用所有导航链接
+            navLinks.forEach(link => {
+                link.classList.add('page-locked');
+                link.title = '代码审查进行中，无法切换页面';
+            });
+
+            if (brandLink) {
+                brandLink.classList.add('page-locked');
+                brandLink.title = '代码审查进行中，无法切换页面';
+            }
+
+            // 禁用用户下拉菜单
+            if (dropdownToggle) {
+                dropdownToggle.classList.add('page-locked');
+                dropdownToggle.title = '代码审查进行中，无法使用用户菜单';
+            }
+
+            if (dropdownMenu) {
+                dropdownMenu.classList.add('page-locked');
+            }
+
+            dropdownItems.forEach(item => {
+                item.classList.add('page-locked');
+                item.title = '代码审查进行中，无法使用此功能';
+            });
+
+            // 显示页面锁定提示
+            showPageLockNotice();
+
+            // 添加点击拦截
+            addNavigationInterceptors();
+        } else {
+            // 恢复所有导航链接
+            navLinks.forEach(link => {
+                link.classList.remove('page-locked');
+                link.title = '';
+            });
+
+            if (brandLink) {
+                brandLink.classList.remove('page-locked');
+                brandLink.title = '';
+            }
+
+            // 恢复用户下拉菜单
+            if (dropdownToggle) {
+                dropdownToggle.classList.remove('page-locked');
+                dropdownToggle.title = '';
+            }
+
+            if (dropdownMenu) {
+                dropdownMenu.classList.remove('page-locked');
+            }
+
+            dropdownItems.forEach(item => {
+                item.classList.remove('page-locked');
+                item.title = '';
+            });
+
+            // 隐藏页面锁定提示
+            hidePageLockNotice();
+
+            // 移除点击拦截
+            removeNavigationInterceptors();
+        }
+    }
+
+    function showPageLockNotice() {
+        // 如果已经存在提示则不重复添加
+        if (document.getElementById('pageLockNotice')) {
+            return;
+        }
+
+        const notice = document.createElement('div');
+        notice.id = 'pageLockNotice';
+        notice.className = 'page-lock-notice';
+        notice.innerHTML = `
+            <i class="bi bi-info-circle me-2"></i>
+            <span>代码审查进行中，页面导航已锁定</span>
+        `;
+
+        document.body.appendChild(notice);
+
+        // 5秒后自动隐藏
+        setTimeout(() => {
+            hidePageLockNotice();
+        }, 5000);
+    }
+
+    function hidePageLockNotice() {
+        const notice = document.getElementById('pageLockNotice');
+        if (notice) {
+            notice.remove();
+        }
+    }
+
+    function addNavigationInterceptors() {
+        const navLinks = document.querySelectorAll('.nav-link:not(.dropdown-toggle), .navbar-brand');
+        const dropdownToggle = document.querySelector('.dropdown-toggle');
+        const dropdownItems = document.querySelectorAll('.dropdown-item');
+
+        navLinks.forEach(link => {
+            link.addEventListener('click', handleNavigationClick);
+        });
+
+        // 拦截下拉菜单切换
+        if (dropdownToggle) {
+            dropdownToggle.addEventListener('click', handleNavigationClick);
+        }
+
+        // 拦截下拉菜单项
+        dropdownItems.forEach(item => {
+            item.addEventListener('click', handleNavigationClick);
+        });
+    }
+
+    function removeNavigationInterceptors() {
+        const navLinks = document.querySelectorAll('.nav-link:not(.dropdown-toggle), .navbar-brand');
+        const dropdownToggle = document.querySelector('.dropdown-toggle');
+        const dropdownItems = document.querySelectorAll('.dropdown-item');
+
+        navLinks.forEach(link => {
+            link.removeEventListener('click', handleNavigationClick);
+        });
+
+        // 移除下拉菜单切换监听
+        if (dropdownToggle) {
+            dropdownToggle.removeEventListener('click', handleNavigationClick);
+        }
+
+        // 移除下拉菜单项监听
+        dropdownItems.forEach(item => {
+            item.removeEventListener('click', handleNavigationClick);
+        });
+    }
+
+    function handleNavigationClick(event) {
+        if (isPageLocked) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            const message = `${lockReason}\n\n是否要停止当前操作并切换页面？`;
+
+            if (confirm(message)) {
+                // 用户确认离开
+                if (onConfirmCallback) {
+                    onConfirmCallback();
+                }
+                unlockPage();
+                // 允许导航
+                window.location.href = event.target.href || event.currentTarget.href;
+            } else {
+                // 用户取消离开
+                if (onCancelCallback) {
+                    onCancelCallback();
+                }
+            }
+        }
+    }
+
+    // 页面加载时检查是否有未完成的操作
+    window.addEventListener('load', function() {
+        // 检查是否有正在进行的审查
+        if (typeof currentReviewIdForCancel !== 'undefined' && currentReviewIdForCancel) {
+            lockPage('代码审查正在进行中');
+        }
+    });
     </script>
 
     {% block scripts %}{% endblock %}
