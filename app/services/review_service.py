@@ -254,26 +254,38 @@ class ReviewService:
             analyzed_files = []
             issue_records = []
 
-            # 初始化AI分析器
-            if not user.ai_api_key:
-                error_msg = 'AI API密钥未配置，无法进行代码分析'
-                if review_id:
-                    self.db.fail_review_record(review_id, error_msg)
-                return {
-                    'success': False,
-                    'error': error_msg,
-                    'error_code': 'AI_CONFIG_ERROR',
-                    'review_id': review_id
-                }
+             # 初始化AI分析器
+             if not user.ai_api_key:
+                 error_msg = 'AI API密钥未配置，无法进行代码分析'
+                 if review_id:
+                     self.db.fail_review_record(review_id, error_msg)
+                 return {
+                     'success': False,
+                     'error': error_msg,
+                     'error_code': 'AI_CONFIG_ERROR',
+                     'review_id': review_id
+                 }
 
-            ai_config = {
-                'ai_api_url': user.ai_api_url,
-                'ai_api_key': user.ai_api_key,
-                'ai_model': user.ai_model,
-                'review_severity_level': getattr(user, 'review_severity_level', 'standard')
-            }
-            ai_analyzer = AICodeAnalyzer(ai_config)
-            self.logger.info("AI analyzer initialized")
+             ai_config = {
+                 'ai_api_url': user.ai_api_url,
+                 'ai_api_key': user.ai_api_key,
+                 'ai_model': user.ai_model,
+                 'review_severity_level': getattr(user, 'review_severity_level', 'standard')
+             }
+             ai_analyzer = AICodeAnalyzer(ai_config)
+             
+             # 验证AI模型是否可用
+             if not ai_analyzer.validate_model_availability():
+                 error_msg = f'AI模型 "{user.ai_model}" 不可用，请检查AI配置'
+                 if review_id:
+                     self.db.fail_review_record(review_id, error_msg)
+                 return {
+                     'success': False,
+                     'error': error_msg,
+                     'error_code': 'AI_MODEL_UNAVAILABLE',
+                     'review_id': review_id
+                 }
+             self.logger.info("AI analyzer initialized")
 
             # 初始化进度跟踪
             # 计算需要分析的文件数（排除删除的文件）
