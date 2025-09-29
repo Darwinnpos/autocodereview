@@ -260,6 +260,10 @@ document.getElementById('reviewForm').addEventListener('submit', async function(
             errorIcon = 'bi-robot';
             errorTitle = 'AI服务问题';
             errorSuggestion = '<small class="text-muted">请检查个人资料中的AI API配置，或稍后重试</small>';
+        } else if (errorMessage.includes('AI模型') && errorMessage.includes('不可用')) {
+            errorIcon = 'bi-robot';
+            errorTitle = 'AI模型不可用';
+            errorSuggestion = '<small class="text-muted">请检查个人资料中的AI模型配置是否正确</small>';
         } else if (errorMessage.includes('配置错误')) {
             errorIcon = 'bi-gear-fill';
             errorTitle = '配置问题';
@@ -268,6 +272,10 @@ document.getElementById('reviewForm').addEventListener('submit', async function(
             errorIcon = 'bi-database-exclamation';
             errorTitle = '系统错误';
             errorSuggestion = '<small class="text-muted">系统内部错误，请联系管理员或稍后重试</small>';
+        } else if (errorMessage.includes('审查记录不存在')) {
+            // 对于"审查记录不存在"错误，显示更具体的错误信息
+            errorIcon = 'bi-exclamation-circle';
+            errorTitle = '审查记录不存在';
         }
 
         resultContent.innerHTML = `
@@ -551,6 +559,10 @@ async function showFinalResult(reviewId) {
             errorIcon = 'bi-robot';
             errorTitle = 'AI分析失败';
             errorSuggestion = '<small class="text-muted">AI服务在代码分析过程中出现问题，请检查AI配置或稍后重试</small>';
+        } else if (errorMessage.includes('AI模型') && errorMessage.includes('不可用')) {
+            errorIcon = 'bi-robot';
+            errorTitle = 'AI模型不可用';
+            errorSuggestion = '<small class="text-muted">请检查个人资料中的AI模型配置是否正确</small>';
         } else if (errorMessage.includes('GitLab')) {
             errorIcon = 'bi-git';
             errorTitle = 'GitLab数据获取失败';
@@ -559,6 +571,10 @@ async function showFinalResult(reviewId) {
             errorIcon = 'bi-database-exclamation';
             errorTitle = '系统错误';
             errorSuggestion = '<small class="text-muted">系统内部错误，请联系管理员</small>';
+        } else if (errorMessage.includes('审查记录不存在')) {
+            // 对于"审查记录不存在"错误，显示更具体的错误信息
+            errorIcon = 'bi-exclamation-circle';
+            errorTitle = '审查记录不存在';
         }
 
         resultContent.innerHTML = `
