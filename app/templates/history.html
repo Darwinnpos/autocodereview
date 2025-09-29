@@ -63,9 +63,10 @@
     </div>
 </div>
 
+
 <div class="row">
-    <!-- 主要内容区 -->
-    <div class="col-lg-8">
+    <!-- 审查历史表格 - 现在占用全宽度 -->
+    <div class="col-12">
         <!-- 审查记录列表 -->
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
@@ -239,10 +240,6 @@
                     <div class="mt-2 small text-muted">暂无趋势数据</div>
                 </div>
             </div>
-        </div>
-    </div>
-</div>
-
 <!-- 详情模态框 -->
 <div class="modal fade" id="reviewDetailModal" tabindex="-1">
     <div class="modal-dialog modal-xl">
@@ -274,12 +271,6 @@ class ReviewHistoryManager {
         this.pageSize = 10;
         this.totalPages = 0;
         this.totalRecords = 0;
-        this.currentFilters = {
-            dateRange: '30',
-            status: ['completed', 'failed'],
-            search: ''
-        };
-        this.trendChart = null;
     }
 
     async init() {
@@ -311,7 +302,7 @@ class ReviewHistoryManager {
         });
 
         // 搜索框回车事件
-        document.getElementById('searchQuery').addEventListener('keypress', (e) => {
+        document.getElementById('searchInput').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 this.applyFilters();
             }
@@ -321,15 +312,13 @@ class ReviewHistoryManager {
     async loadAll() {
         await Promise.all([
             this.loadStatistics(),
-            this.loadReviews(),
-            this.loadTrendData()
+            this.loadReviews()
         ]);
     }
 
     async loadStatistics() {
         try {
-            const params = this.buildFilterParams();
-            const response = await axios.get('/api/history/statistics', { params });
+            const response = await axios.get('/api/history/statistics');
 
             if (response.data.success) {
                 this.updateStatisticsCards(response.data.data);
@@ -346,7 +335,6 @@ class ReviewHistoryManager {
             this.showLoadingState();
 
             const params = {
-                ...this.buildFilterParams(),
                 page: this.currentPage,
                 limit: this.pageSize
             };
@@ -377,89 +365,7 @@ class ReviewHistoryManager {
         }
     }
 
-    async loadTrendData() {
-        try {
-            const chartContainer = document.getElementById('reviewTrendChart');
-            const loadingIndicator = document.getElementById('chartLoadingIndicator');
-            const emptyState = document.getElementById('chartEmptyState');
 
-            loadingIndicator.style.display = 'block';
-            emptyState.style.display = 'none';
-            chartContainer.style.display = 'none';
-
-            const params = this.buildFilterParams();
-            const response = await axios.get('/api/history/trend', { params });
-
-            if (response.data.success && response.data.data.length > 0) {
-                this.renderTrendChart(response.data.data);
-                loadingIndicator.style.display = 'none';
-                chartContainer.style.display = 'block';
-            } else {
-                loadingIndicator.style.display = 'none';
-                emptyState.style.display = 'block';
-            }
-        } catch (error) {
-            console.error('Failed to load trend data:', error);
-            document.getElementById('chartLoadingIndicator').style.display = 'none';
-            document.getElementById('chartEmptyState').style.display = 'block';
-        }
-    }
-
-    buildFilterParams() {
-        const params = {};
-
-        // 时间范围
-        const dateRange = document.getElementById('dateRange').value;
-        if (dateRange === 'custom') {
-            const startDate = document.getElementById('startDate').value;
-            const endDate = document.getElementById('endDate').value;
-            if (startDate && endDate) {
-                params.start_date = startDate;
-                params.end_date = endDate;
-            }
-        } else if (dateRange !== 'all') {
-            params.days = parseInt(dateRange);
-        }
-
-        // 状态筛选
-        const statuses = [];
-        if (document.getElementById('statusCompleted').checked) statuses.push('completed');
-        if (document.getElementById('statusFailed').checked) statuses.push('failed');
-        if (document.getElementById('statusPending').checked) statuses.push('pending');
-        if (document.getElementById('statusCancelled').checked) statuses.push('cancelled');
-
-        if (statuses.length > 0) {
-            params.status = statuses.join(',');
-        }
-
-        // 搜索关键词
-        const search = document.getElementById('searchQuery').value.trim();
-        if (search) {
-            params.search = search;
-        }
-
-        return params;
-    }
-
-    applyFilters() {
-        this.currentPage = 1;
-        this.loadAll();
-    }
-
-    resetFilters() {
-        document.getElementById('dateRange').value = '30';
-        document.getElementById('customDateRange').style.display = 'none';
-        document.getElementById('startDate').value = '';
-        document.getElementById('endDate').value = '';
-        document.getElementById('statusCompleted').checked = true;
-        document.getElementById('statusFailed').checked = true;
-        document.getElementById('statusPending').checked = false;
-        document.getElementById('statusCancelled').checked = false;
-        document.getElementById('searchQuery').value = '';
-
-        this.currentPage = 1;
-        this.loadAll();
-    }
 
     updateStatisticsCards(stats) {
         document.getElementById('totalReviews').textContent = stats.total_reviews || 0;
@@ -546,10 +452,7 @@ class ReviewHistoryManager {
                 </div>
             </td>
             <td class="text-center">
-                <div class="small">
-                    <span class="badge bg-success">${review.comments_posted || 0}</span>
-                    <div class="text-muted mt-1">已发布</div>
-                </div>
+                <span class="badge bg-success">${review.comments_posted || 0}</span>
             </td>
             <td>
                 <span class="badge bg-${status.class}">
