@@ -764,7 +764,7 @@ https://your-gitlab-domain.com/group/project/-/merge_requests/456</div>
                     </h2>
 
                     <div class="row">
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <div class="card h-100">
                                 <div class="card-header">
                                     <i class="bi bi-clock"></i>
@@ -779,7 +779,7 @@ https://your-gitlab-domain.com/group/project/-/merge_requests/456</div>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <div class="card h-100">
                                 <div class="card-header">
                                     <i class="bi bi-check-circle"></i>
@@ -787,15 +787,14 @@ https://your-gitlab-domain.com/group/project/-/merge_requests/456</div>
                                 </div>
                                 <div class="card-body">
                                     <ul>
-                                        <li>仔细阅读每条评论，理解问题描述</li>
-                                        <li>结合代码上下文判断评论的准确性</li>
-                                        <li>优先确认安全风险和语法错误类评论</li>
-                                        <li>对于风格类建议，结合团队规范决定</li>
+                                        <li>仔细阅读每条评论</li>
+                                        <li>优先确认安全风险和语法错误</li>
+                                        <li>风格类建议结合团队规范决定</li>
                                     </ul>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <div class="card h-100">
                                 <div class="card-header">
                                     <i class="bi bi-people"></i>
@@ -810,37 +809,18 @@ https://your-gitlab-domain.com/group/project/-/merge_requests/456</div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-
-                    <div class="row mt-4">
-                        <div class="col-md-6">
+                        <div class="col-md-3">
                             <div class="card h-100">
                                 <div class="card-header">
                                     <i class="bi bi-exclamation-triangle"></i>
-                                    <strong>系统限制注意事项</strong>
+                                    <strong>使用限制</strong>
                                 </div>
                                 <div class="card-body">
                                     <ul>
-                                        <li><strong>大型变更处理限制</strong>：单个 MR 涉及文件过多（超过 50 个）或行数过大（超过 5000 行）时，AI 分析可能超时或不完整</li>
-                                        <li><strong>上下文长度限制</strong>：单个文件内容过长（超过 10000 行）时，AI 可能无法分析完整上下文，建议将大文件拆分</li>
-                                        <li><strong>网络超时限制</strong>：AI 分析过程受网络连接影响，复杂代码分析可能需要较长时间，建议在网络稳定时进行</li>
-                                        <li><strong>并发处理限制</strong>：避免同时对多个大型 MR 进行审查，以免影响系统性能</li>
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="card h-100">
-                                <div class="card-header">
-                                    <i class="bi bi-lightbulb"></i>
-                                    <strong>优化建议</strong>
-                                </div>
-                                <div class="card-body">
-                                    <ul>
-                                        <li><strong>拆分大型变更</strong>：将大型功能开发拆分为多个小的 MR，每个 MR 专注于单一功能或模块</li>
-                                        <li><strong>分阶段审查</strong>：对于复杂项目，优先审查核心逻辑和安全相关代码，次要功能可后续审查</li>
-                                        <li><strong>预处理代码</strong>：提交前进行基本的代码格式化和静态检查，减少 AI 分析负担</li>
-                                        <li><strong>设置合理期望</strong>：AI 审查作为辅助工具，无法完全替代人工代码审查，重要代码仍需人工复查</li>
+                                        <li>大型 MR（超过 10 文件/500 行）可能超时</li>
+                                        <li>超长文件（>500 行）建议拆分</li>
+                                        <li>避免同时审查多个大型 MR</li>
+                                        <li>AI 审查仅作辅助，重要代码需人工复查</li>
                                     </ul>
                                 </div>
                             </div>
