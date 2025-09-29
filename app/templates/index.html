@@ -760,6 +760,11 @@ function loadCommentsPage(page) {
     // 更新评论容器
     document.getElementById('commentsContainer').innerHTML = commentsHtml;
 
+    // 自动加载当前页所有评论的代码上下文
+    pageComments.forEach(comment => {
+        loadCodeContextForComment(currentReviewId, comment.id);
+    });
+
     // 更新页面信息
     const totalPages = Math.ceil(currentComments.length / pageSize);
     document.getElementById('pageInfo').textContent = `第 ${page} 页，共 ${totalPages} 页 (显示 ${startIndex + 1}-${endIndex} / ${currentComments.length})`;
@@ -792,16 +797,8 @@ function generateCommentHtml(comment, reviewId) {
                 </div>
             </div>
             <div class="card-body">
-                <!-- 代码上下文按钮 -->
-                <div class="mb-3 text-center">
-                    <button class="btn btn-outline-primary btn-sm context-toggle-btn" onclick="toggleCodeContext(${reviewId}, ${comment.id})" data-issue-id="${comment.id}">
-                        <i class="bi bi-code-slash"></i>
-                        <span class="toggle-text">显示代码</span>
-                    </button>
-                </div>
-
-                <!-- 代码上下文容器 -->
-                <div class="code-context-container mb-3" id="context-${comment.id}" style="display: none;">
+                <!-- 代码上下文容器 - 默认显示 -->
+                <div class="code-context-container mb-3" id="context-${comment.id}">
                     <div class="text-center p-3 border rounded bg-light">
                         <div class="spinner-border spinner-border-sm" role="status">
                             <span class="visually-hidden">加载中...</span>
@@ -886,72 +883,49 @@ function goToPage(page) {
 // 存储已加载的代码上下文
 const loadedContexts = new Map();
 
-async function toggleCodeContext(reviewId, issueId) {
+async function loadCodeContextForComment(reviewId, issueId) {
     const container = document.getElementById(`context-${issueId}`);
-    const button = document.querySelector(`[data-issue-id="${issueId}"]`);
-    const toggleText = button.querySelector('.toggle-text');
 
-    if (container.style.display === 'none') {
-        // 显示代码上下文
-        container.style.display = 'block';
-        button.disabled = true;
+    if (!container) {
+        console.error(`Context container not found for issue ${issueId}`);
+        return;
+    }
 
-        // 检查是否已经加载过
-        if (loadedContexts.has(issueId)) {
-            container.innerHTML = loadedContexts.get(issueId);
-            toggleText.textContent = '隐藏代码';
-            button.classList.remove('btn-outline-primary');
-            button.classList.add('btn-outline-success');
-            button.disabled = false;
-            return;
-        }
+    // 检查是否已经加载过
+    if (loadedContexts.has(issueId)) {
+        container.innerHTML = loadedContexts.get(issueId);
+        return;
+    }
 
-        try {
-            const response = await axios.get(`/api/review/${reviewId}/comment/${issueId}/context`);
+    try {
+        const response = await axios.get(`/api/review/${reviewId}/comment/${issueId}/context`);
 
-            if (response.data.success) {
-                const contextHtml = `
-                    <div class="border rounded" style="font-family: 'Courier New', monospace; font-size: 13px; overflow-x: auto; background-color: white;">
-                        ${renderCodeContext(response.data.data.context)}
-                    </div>
-                `;
-
-                // 缓存已加载的内容
-                loadedContexts.set(issueId, contextHtml);
-                container.innerHTML = contextHtml;
-                toggleText.textContent = '隐藏代码';
-                button.classList.remove('btn-outline-primary');
-                button.classList.add('btn-outline-success');
-            } else {
-                container.innerHTML = `
-                    <div class="alert alert-warning">
-                        <i class="bi bi-exclamation-triangle"></i>
-                        无法加载代码上下文：${response.data.error || '未知错误'}
-                    </div>
-                `;
-                toggleText.textContent = '重试加载';
-            }
-        } catch (error) {
-            console.error('Failed to load code context:', error);
-            container.innerHTML = `
-                <div class="alert alert-danger">
-                    <i class="bi bi-x-circle"></i>
-                    加载失败：${error.response?.data?.error || error.message || '网络错误'}
-                    <button class="btn btn-sm btn-outline-danger ms-2" onclick="toggleCodeContext(${reviewId}, ${issueId})">
-                        重试
-                    </button>
+        if (response.data.success) {
+            const contextHtml = `
+                <div class="border rounded" style="font-family: 'Courier New', monospace; font-size: 13px; overflow-x: auto; background-color: white;">
+                    ${renderCodeContext(response.data.data.context)}
                 </div>
             `;
-            toggleText.textContent = '重试加载';
-        } finally {
-            button.disabled = false;
+
+            // 缓存已加载的内容
+            loadedContexts.set(issueId, contextHtml);
+            container.innerHTML = contextHtml;
+        } else {
+            container.innerHTML = `
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    无法加载代码上下文：${response.data.error || '未知错误'}
+                </div>
+            `;
         }
-    } else {
-        // 隐藏代码上下文
-        container.style.display = 'none';
-        toggleText.textContent = '显示代码';
-        button.classList.remove('btn-outline-success');
-        button.classList.add('btn-outline-primary');
+    } catch (error) {
+        console.error('Failed to load code context:', error);
+        container.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="bi bi-x-circle"></i>
+                加载失败：${error.response?.data?.error || error.message || '网络错误'}
+            </div>
+        `;
     }
 }
 
