@@ -386,7 +386,7 @@ class ReviewDatabase:
         conn.close()
         return count
 
-    def get_review_statistics(self, user_id: str = None, days: int = 30, start_date: str = None, end_date: str = None) -> Dict:
+    def get_review_statistics(self, user_id: str = None, days: int = None, start_date: str = None, end_date: str = None) -> Dict:
         """获取审查统计信息"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()

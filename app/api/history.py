@@ -58,7 +58,7 @@ def get_statistics():
             return jsonify({'success': False, 'error': '请先登录'})
 
         # 获取查询参数
-        days = request.args.get('days', type=int)
+        days = request.args.get('days', type=int) or None
         start_date = request.args.get('start_date')
         end_date = request.args.get('end_date')
 
@@ -139,7 +139,7 @@ def get_reviews():
         # 获取查询参数
         page = request.args.get('page', 1, type=int)
         limit = request.args.get('limit', 10, type=int)
-        days = request.args.get('days', type=int)
+        days = request.args.get('days', type=int) or None
         start_date = request.args.get('start_date')
         end_date = request.args.get('end_date')
         status = request.args.get('status', '')
