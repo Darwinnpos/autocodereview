@@ -142,9 +142,7 @@
                     <a class="nav-link" href="#gitlab-config">GitLab 配置</a>
                     <a class="nav-link" href="#review-config">审查配置</a>
                     <a class="nav-link" href="#ai-config">AI 配置</a>
-                    <a class="nav-link" href="#config-test">配置验证</a>
                     <a class="nav-link" href="#how-to-review">如何进行代码审查</a>
-                    <a class="nav-link" href="#review-workflow">完整工作流程</a>
                     <a class="nav-link" href="#best-practices">最佳实践</a>
                     <a class="nav-link" href="#troubleshooting">常见问题</a>
                 </nav>
@@ -252,19 +250,42 @@ Select scopes:
                                 <div class="col-md-6">
                                     <h6>GitLab URL</h6>
                                     <div class="code-example">http://gitlab.hzcctech.com</div>
-
-                                    <h6>访问令牌</h6>
-                                    <div class="code-example">glpat-xxxxxxxxxxxxxxxxxxxx</div>
-
-                                    <h6>审查者名称</h6>
-                                    <div class="code-example">AutoCodeReview Bot</div>
                                 </div>
                                 <div class="col-md-6">
-                                    <div class="screenshot-placeholder">
-                                        <i class="bi bi-image" style="font-size: 2rem;"></i>
-                                        <p>配置页面截图位置</p>
-                                    </div>
+                                    <h6>访问令牌</h6>
+                                    <div class="code-example">glpat-xxxxxxxxxxxxxxxxxxxx</div>
                                 </div>
+                            </div>
+
+                            <h6 class="mt-3">验证配置</h6>
+                            <ol>
+                                <li>填写完GitLab URL和访问令牌后</li>
+                                <li>点击 <strong>"测试GitLab连接"</strong> 按钮</li>
+                                <li>系统会自动验证URL可达性和令牌有效性</li>
+                                <li>验证成功后再点击 <strong>"保存GitLab配置"</strong></li>
+                            </ol>
+
+                            <div class="alert alert-tip">
+                                <h6><i class="bi bi-lightbulb"></i> 配置建议</h6>
+                                <ul class="mb-0">
+                                    <li><strong>先测试再保存</strong>：避免保存无效配置</li>
+                                    <li><strong>检查网络连接</strong>：确保能访问GitLab服务器</li>
+                                    <li><strong>验证令牌权限</strong>：确保包含必要的API权限</li>
+                                </ul>
+                            </div>
+
+                            <h6>验证结果说明</h6>
+                            <div class="alert alert-success">
+                                <strong>成功示例：</strong>GitLab连接测试成功
+                            </div>
+
+                            <div class="alert alert-danger">
+                                <strong>失败示例：</strong>
+                                <ul class="mb-0">
+                                    <li>401 Unauthorized → 检查访问令牌</li>
+                                    <li>403 Forbidden → 检查令牌权限</li>
+                                    <li>404 Not Found → 检查 URL</li>
+                                </ul>
                             </div>
                         </div>
                     </div>
@@ -555,79 +576,25 @@ Select scopes:
                                     <li><strong>验证API密钥</strong>：密钥错误会导致探测失败</li>
                                 </ul>
                             </div>
-                        </div>
-                    </div>
-                </section>
 
-                <!-- 配置验证 -->
-                <section id="config-test" class="guide-section">
-                    <h2 class="mb-4">
-                        <i class="bi bi-check-circle"></i>
-                        配置验证
-                    </h2>
-
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="card">
-                                <div class="card-header">
-                                    <i class="bi bi-gitlab"></i>
-                                    <strong>GitLab 连接测试</strong>
-                                </div>
-                                <div class="card-body">
-                                    <ol>
-                                        <li>填写完 GitLab 相关配置后</li>
-                                        <li>点击 "测试 GitLab 连接" 按钮</li>
-                                        <li>系统会验证连接状态</li>
-                                    </ol>
-
-                                    <div class="alert alert-success">
-                                        <strong>成功示例：</strong>GitLab连接测试成功
-                                    </div>
-
-                                    <div class="alert alert-danger">
-                                        <strong>失败示例：</strong>
-                                        <ul class="mb-0">
-                                            <li>401 Unauthorized → 检查访问令牌</li>
-                                            <li>403 Forbidden → 检查令牌权限</li>
-                                            <li>404 Not Found → 检查 URL</li>
-                                        </ul>
-                                    </div>
-                                </div>
+                            <h6>验证结果说明</h6>
+                            <div class="alert alert-success">
+                                <strong>成功示例：</strong>AI API连接测试成功！
                             </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="card">
-                                <div class="card-header">
-                                    <i class="bi bi-robot"></i>
-                                    <strong>AI 配置验证</strong>
-                                </div>
-                                <div class="card-body">
-                                    <ol>
-                                        <li>填写完 AI 相关配置后</li>
-                                        <li>点击 "探测" 按钮发现可用模型</li>
-                                        <li>选择模型后点击 "测试AI连接" 按钮</li>
-                                        <li>系统会验证API连接和模型可用性</li>
-                                    </ol>
 
-                                    <div class="alert alert-success">
-                                        <strong>成功示例：</strong>AI API连接测试成功！
-                                    </div>
-
-                                    <div class="alert alert-danger">
-                                        <strong>失败示例：</strong>
-                                        <ul class="mb-0">
-                                            <li>HTTP 401 → 检查API密钥是否正确</li>
-                                            <li>HTTP 403 → 检查API密钥权限</li>
-                                            <li>HTTP 404 → 检查API URL和模型名称</li>
-                                            <li>Connection failed → 检查网络连接</li>
-                                        </ul>
-                                    </div>
-
-                                </div>
+                            <div class="alert alert-danger">
+                                <strong>失败示例：</strong>
+                                <ul class="mb-0">
+                                    <li>HTTP 401 → 检查API密钥是否正确</li>
+                                    <li>HTTP 403 → 检查API密钥权限</li>
+                                    <li>HTTP 404 → 检查API URL和模型名称</li>
+                                    <li>Connection failed → 检查网络连接</li>
+                                </ul>
                             </div>
                         </div>
                     </div>
                 </section>
+
 
                 <!-- 如何进行代码审查 -->
                 <section id="how-to-review" class="guide-section">
@@ -788,46 +755,6 @@ https://your-gitlab-domain.com/group/project/-/merge_requests/456</div>
                     </div>
                 </section>
 
-                <!-- 完整工作流程 -->
-                <section id="review-workflow" class="guide-section">
-                    <h2 class="mb-4">
-                        <i class="bi bi-diagram-3"></i>
-                        完整工作流程示例
-                    </h2>
-
-                    <div class="card">
-                        <div class="card-header">
-                            <strong>场景：审查一个包含数据库操作的 Python MR</strong>
-                        </div>
-                        <div class="card-body">
-                            <div class="code-example">
-1. 开发者提交 MR：
-   https://gitlab.com/myproject/backend/-/merge_requests/45
-
-2. 审查者操作：
-   - 登录 AutoCodeReview
-   - 输入 MR URL
-   - 点击"开始审查"
-   - 获得审查 ID：123
-
-3. 系统处理：
-   - 分析 3 个修改的 Python 文件
-   - 发现 5 个问题（2个警告，3个建议）
-   - 生成 5 条评论
-
-4. 审查确认：
-   - 查看所有 5 条评论
-   - 确认其中 4 条有用的评论
-   - 拒绝 1 条误报评论
-   - 批量发布到 GitLab
-
-5. GitLab 展示：
-   - MR 页面显示 4 条新评论
-   - 开发者收到通知
-   - 根据建议修改代码</div>
-                        </div>
-                    </div>
-                </section>
 
                 <!-- 最佳实践 -->
                 <section id="best-practices" class="guide-section">
@@ -879,6 +806,41 @@ https://your-gitlab-domain.com/group/project/-/merge_requests/456</div>
                                         <li>指定专人负责评论确认</li>
                                         <li>建立评论确认的标准流程</li>
                                         <li>定期回顾和优化审查质量</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row mt-4">
+                        <div class="col-md-6">
+                            <div class="card h-100">
+                                <div class="card-header">
+                                    <i class="bi bi-exclamation-triangle"></i>
+                                    <strong>系统限制注意事项</strong>
+                                </div>
+                                <div class="card-body">
+                                    <ul>
+                                        <li><strong>大型变更处理限制</strong>：单个 MR 涉及文件过多（超过 50 个）或行数过大（超过 5000 行）时，AI 分析可能超时或不完整</li>
+                                        <li><strong>上下文长度限制</strong>：单个文件内容过长（超过 10000 行）时，AI 可能无法分析完整上下文，建议将大文件拆分</li>
+                                        <li><strong>网络超时限制</strong>：AI 分析过程受网络连接影响，复杂代码分析可能需要较长时间，建议在网络稳定时进行</li>
+                                        <li><strong>并发处理限制</strong>：避免同时对多个大型 MR 进行审查，以免影响系统性能</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card h-100">
+                                <div class="card-header">
+                                    <i class="bi bi-lightbulb"></i>
+                                    <strong>优化建议</strong>
+                                </div>
+                                <div class="card-body">
+                                    <ul>
+                                        <li><strong>拆分大型变更</strong>：将大型功能开发拆分为多个小的 MR，每个 MR 专注于单一功能或模块</li>
+                                        <li><strong>分阶段审查</strong>：对于复杂项目，优先审查核心逻辑和安全相关代码，次要功能可后续审查</li>
+                                        <li><strong>预处理代码</strong>：提交前进行基本的代码格式化和静态检查，减少 AI 分析负担</li>
+                                        <li><strong>设置合理期望</strong>：AI 审查作为辅助工具，无法完全替代人工代码审查，重要代码仍需人工复查</li>
                                     </ul>
                                 </div>
                             </div>
