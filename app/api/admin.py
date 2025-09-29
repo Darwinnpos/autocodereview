@@ -181,7 +181,8 @@ def get_review_statistics():
         cursor = conn.cursor()
 
         # 时间条件
-        time_condition = "created_at >= ? AND created_at <= ?"
+        time_condition_reviews = "created_at >= ? AND created_at <= ?"
+        time_condition_join = "r.created_at >= ? AND r.created_at <= ?"
         time_params = [start_date, end_date + 'T23:59:59']
 
         # 基本统计
@@ -190,11 +191,9 @@ def get_review_statistics():
                 COUNT(*) as total_reviews,
                 SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed_reviews,
                 SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed_reviews,
-                SUM(total_issues_found) as total_issues,
-                SUM(comments_posted) as total_comments,
-                COUNT(CASE WHEN comments_posted > 0 THEN 1 END) as reviews_with_comments
+                SUM(total_issues_found) as total_issues
             FROM reviews
-            WHERE {time_condition}
+            WHERE {time_condition_reviews}
         """, time_params)
 
         stats = cursor.fetchone()
@@ -202,8 +201,20 @@ def get_review_statistics():
         completed_reviews = stats[1] or 0
         failed_reviews = stats[2] or 0
         total_issues = stats[3] or 0
-        total_comments = stats[4] or 0
-        reviews_with_comments = stats[5] or 0
+
+        # 单独查询评论统计（从issues表获取真实数据）
+        cursor.execute(f"""
+            SELECT
+                COUNT(CASE WHEN i.comment_status IN ('confirmed', 'posted') THEN 1 END) as total_comments,
+                COUNT(DISTINCT CASE WHEN i.comment_status IN ('confirmed', 'posted') THEN i.review_id END) as reviews_with_comments
+            FROM issues i
+            JOIN reviews r ON i.review_id = r.id
+            WHERE {time_condition_join}
+        """, time_params)
+
+        comment_stats = cursor.fetchone()
+        total_comments = comment_stats[0] or 0
+        reviews_with_comments = comment_stats[1] or 0
 
         # 计算成功率和评论率
         success_rate = (completed_reviews / total_reviews * 100) if total_reviews > 0 else 0
@@ -213,13 +224,14 @@ def get_review_statistics():
         # 获取趋势数据
         cursor.execute(f"""
             SELECT
-                DATE(created_at) as date,
+                DATE(r.created_at) as date,
                 COUNT(*) as total_count,
-                SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed_count,
-                SUM(comments_posted) as comments_count
-            FROM reviews
-            WHERE {time_condition}
-            GROUP BY DATE(created_at)
+                SUM(CASE WHEN r.status = 'completed' THEN 1 ELSE 0 END) as completed_count,
+                COUNT(CASE WHEN i.comment_status IN ('confirmed', 'posted') THEN 1 END) as comments_count
+            FROM reviews r
+            LEFT JOIN issues i ON r.id = i.review_id
+            WHERE {time_condition_join}
+            GROUP BY DATE(r.created_at)
             ORDER BY date
         """, time_params)
 

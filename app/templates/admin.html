@@ -197,72 +197,70 @@
                 </div>
             </div>
             <div class="card-body">
-                <!-- 统计卡片 -->
+                <!-- 统计卡片 - 8个并排显示 -->
                 <div class="row mb-4">
-                    <div class="col-md-3">
+                    <!-- 审查相关统计 -->
+                    <div class="col-lg-15 col-md-6 col-sm-6 mb-3" style="flex: 0 0 12.5%; max-width: 12.5%;">
                         <div class="card bg-light">
-                            <div class="card-body text-center">
-                                <h3 class="text-primary mb-1" id="totalReviews">-</h3>
+                            <div class="card-body text-center p-2">
+                                <h5 class="text-primary mb-1" id="totalReviews">-</h5>
                                 <small class="text-muted">总审查数</small>
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-lg-15 col-md-6 col-sm-6 mb-3" style="flex: 0 0 12.5%; max-width: 12.5%;">
                         <div class="card bg-light">
-                            <div class="card-body text-center">
-                                <h3 class="text-success mb-1" id="completedReviews">-</h3>
+                            <div class="card-body text-center p-2">
+                                <h5 class="text-success mb-1" id="completedReviews">-</h5>
                                 <small class="text-muted">成功完成</small>
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-lg-15 col-md-6 col-sm-6 mb-3" style="flex: 0 0 12.5%; max-width: 12.5%;">
                         <div class="card bg-light">
-                            <div class="card-body text-center">
-                                <h3 class="text-warning mb-1" id="totalIssuesFound">-</h3>
+                            <div class="card-body text-center p-2">
+                                <h5 class="text-warning mb-1" id="totalIssuesFound">-</h5>
                                 <small class="text-muted">发现问题</small>
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-lg-15 col-md-6 col-sm-6 mb-3" style="flex: 0 0 12.5%; max-width: 12.5%;">
                         <div class="card bg-light">
-                            <div class="card-body text-center">
-                                <h3 class="text-info mb-1" id="successRate">-</h3>
+                            <div class="card-body text-center p-2">
+                                <h5 class="text-info mb-1" id="successRate">-</h5>
                                 <small class="text-muted">成功率</small>
                             </div>
                         </div>
                     </div>
-                </div>
-
-                <!-- 第二行统计卡片 -->
-                <div class="row mb-4">
-                    <div class="col-md-3">
+                    <!-- 评论相关统计 -->
+                    <div class="col-lg-15 col-md-6 col-sm-6 mb-3" style="flex: 0 0 12.5%; max-width: 12.5%;">
                         <div class="card bg-light">
-                            <div class="card-body text-center">
-                                <h3 class="text-primary mb-1" id="totalComments">-</h3>
+                            <div class="card-body text-center p-2">
+                                <h5 class="text-primary mb-1" id="totalComments">-</h5>
                                 <small class="text-muted">总评论数</small>
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-lg-15 col-md-6 col-sm-6 mb-3" style="flex: 0 0 12.5%; max-width: 12.5%;">
                         <div class="card bg-light">
-                            <div class="card-body text-center">
-                                <h3 class="text-success mb-1" id="avgCommentsPerReview">-</h3>
+                            <div class="card-body text-center p-2">
+                                <h5 class="text-success mb-1" id="avgCommentsPerReview">-</h5>
                                 <small class="text-muted">平均评论数/审查</small>
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-lg-15 col-md-6 col-sm-6 mb-3" style="flex: 0 0 12.5%; max-width: 12.5%;">
                         <div class="card bg-light">
-                            <div class="card-body text-center">
-                                <h3 class="text-warning mb-1" id="reviewsWithComments">-</h3>
+                            <div class="card-body text-center p-2">
+                                <h5 class="text-warning mb-1" id="reviewsWithComments">-</h5>
                                 <small class="text-muted">有评论的审查</small>
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-lg-15 col-md-6 col-sm-6 mb-3" style="flex: 0 0 12.5%; max-width: 12.5%;">
                         <div class="card bg-light">
-                            <div class="card-body text-center">
-                                <h3 class="text-info mb-1" id="commentRate">-</h3>
+                            <div class="card-body text-center p-2">
+                                <h5 class="text-info mb-1" id="commentRate">-</h5>
                                 <small class="text-muted">评论率</small>
                             </div>
                         </div>
@@ -907,27 +905,29 @@ function renderTrendChart(data) {
     });
 
     trendChart = new Chart(ctx, {
-        type: 'line',
+        type: 'bar',
         data: {
             labels: labels,
             datasets: [{
                 label: '总审查数',
                 data: trendData.map(item => item.total_count),
+                backgroundColor: 'rgba(13, 110, 253, 0.8)',
                 borderColor: '#0d6efd',
-                backgroundColor: 'rgba(13, 110, 253, 0.1)',
-                tension: 0.4
+                borderWidth: 1,
+                yAxisID: 'y'
             }, {
                 label: '成功完成',
                 data: trendData.map(item => item.completed_count),
+                backgroundColor: 'rgba(25, 135, 84, 0.8)',
                 borderColor: '#198754',
-                backgroundColor: 'rgba(25, 135, 84, 0.1)',
-                tension: 0.4
+                borderWidth: 1,
+                yAxisID: 'y'
             }, {
                 label: '评论数',
                 data: trendData.map(item => item.comments_count || 0),
+                backgroundColor: 'rgba(253, 126, 20, 0.8)',
                 borderColor: '#fd7e14',
-                backgroundColor: 'rgba(253, 126, 20, 0.1)',
-                tension: 0.4,
+                borderWidth: 1,
                 yAxisID: 'y1'
             }]
         },
@@ -940,6 +940,9 @@ function renderTrendChart(data) {
                 }
             },
             scales: {
+                x: {
+                    stacked: false
+                },
                 y: {
                     type: 'linear',
                     display: true,

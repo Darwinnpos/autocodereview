@@ -444,6 +444,38 @@ class ReviewDatabase:
 
             active_users = 1 if total_reviews > 0 else 0
 
+        # 添加评论统计（修复后的逻辑）
+        if user_id is None:
+            # 全局评论统计
+            comment_where_clause = where_clause.replace('created_at', 'r.created_at')
+            cursor.execute(f'''
+                SELECT
+                    COUNT(CASE WHEN i.comment_status IN ('confirmed', 'posted') THEN 1 END) as total_comments,
+                    COUNT(DISTINCT CASE WHEN i.comment_status IN ('confirmed', 'posted') THEN i.review_id END) as reviews_with_comments
+                FROM issues i
+                JOIN reviews r ON i.review_id = r.id
+                WHERE {comment_where_clause}
+            ''', date_params)
+        else:
+            # 用户评论统计
+            comment_where_clause = where_clause.replace('created_at', 'r.created_at')
+            cursor.execute(f'''
+                SELECT
+                    COUNT(CASE WHEN i.comment_status IN ('confirmed', 'posted') THEN 1 END) as total_comments,
+                    COUNT(DISTINCT CASE WHEN i.comment_status IN ('confirmed', 'posted') THEN i.review_id END) as reviews_with_comments
+                FROM issues i
+                JOIN reviews r ON i.review_id = r.id
+                WHERE r.user_id = ? AND {comment_where_clause}
+            ''', user_params)
+
+        comment_stats = cursor.fetchone()
+        total_comments = comment_stats[0] or 0
+        reviews_with_comments = comment_stats[1] or 0
+
+        # 计算评论相关指标
+        comment_rate = (reviews_with_comments / total_reviews * 100) if total_reviews > 0 else 0
+        avg_comments_per_review = (total_comments / total_reviews) if total_reviews > 0 else 0
+
         conn.close()
 
         return {
@@ -453,6 +485,10 @@ class ReviewDatabase:
             'total_issues': total_issues,
             'active_users': active_users,
             'success_rate': round(completed_reviews / total_reviews * 100, 1) if total_reviews > 0 else 0,
+            'total_comments': total_comments,
+            'reviews_with_comments': reviews_with_comments,
+            'comment_rate': round(comment_rate, 1),
+            'avg_comments_per_review': round(avg_comments_per_review, 1),
             'days': days
         }
 
