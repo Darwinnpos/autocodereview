@@ -138,108 +138,12 @@
         </div>
     </div>
 
-    <!-- 右侧筛选面板 -->
-    <div class="col-lg-4">
-        <!-- 筛选与搜索 -->
-        <div class="card mb-4">
-            <div class="card-header">
-                <h6 class="mb-0">
-                    <i class="bi bi-funnel"></i> 筛选与搜索
-                </h6>
-            </div>
-            <div class="card-body">
-                <!-- 时间范围选择 -->
-                <div class="mb-3">
-                    <label class="form-label">时间范围</label>
-                    <select class="form-select" id="dateRange">
-                        <option value="7">最近7天</option>
-                        <option value="30" selected>最近30天</option>
-                        <option value="90">最近90天</option>
-                        <option value="all">全部时间</option>
-                        <option value="custom">自定义</option>
-                    </select>
-                </div>
 
-                <!-- 自定义日期范围 -->
-                <div id="customDateRange" style="display: none;">
-                    <div class="row mb-3">
-                        <div class="col-6">
-                            <label class="form-label small">开始日期</label>
-                            <input type="date" class="form-control form-control-sm" id="startDate">
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label small">结束日期</label>
-                            <input type="date" class="form-control form-control-sm" id="endDate">
-                        </div>
-                    </div>
-                </div>
 
-                <!-- 状态筛选 -->
-                <div class="mb-3">
-                    <label class="form-label">审查状态</label>
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="statusCompleted" checked>
-                        <label class="form-check-label small">
-                            <span class="badge bg-success">已完成</span>
-                        </label>
-                    </div>
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="statusFailed" checked>
-                        <label class="form-check-label small">
-                            <span class="badge bg-danger">失败</span>
-                        </label>
-                    </div>
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="statusPending">
-                        <label class="form-check-label small">
-                            <span class="badge bg-primary">进行中</span>
-                        </label>
-                    </div>
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="statusCancelled">
-                        <label class="form-check-label small">
-                            <span class="badge bg-secondary">已取消</span>
-                        </label>
-                    </div>
-                </div>
 
-                <!-- 搜索框 -->
-                <div class="mb-3">
-                    <label class="form-label">搜索</label>
-                    <input type="text" class="form-control" id="searchQuery"
-                           placeholder="项目名称、MR标题、分支名...">
-                    <div class="form-text small">支持模糊搜索</div>
-                </div>
+    </div>
+</div>
 
-                <div class="d-grid gap-2">
-                    <button class="btn btn-primary btn-sm" id="applyFiltersBtn">
-                        <i class="bi bi-search"></i> 应用筛选
-                    </button>
-                    <button class="btn btn-outline-secondary btn-sm" id="resetFiltersBtn">
-                        <i class="bi bi-arrow-counterclockwise"></i> 重置筛选
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- 趋势分析 -->
-        <div class="card">
-            <div class="card-header">
-                <h6 class="mb-0">
-                    <i class="bi bi-bar-chart"></i> 趋势分析
-                </h6>
-            </div>
-            <div class="card-body">
-                <canvas id="reviewTrendChart" height="200"></canvas>
-                <div id="chartLoadingIndicator" class="text-center p-3">
-                    <div class="spinner-border spinner-border-sm" role="status"></div>
-                    <div class="mt-2 small text-muted">加载趋势数据...</div>
-                </div>
-                <div id="chartEmptyState" class="text-center p-3" style="display: none;">
-                    <i class="bi bi-graph-up text-muted"></i>
-                    <div class="mt-2 small text-muted">暂无趋势数据</div>
-                </div>
-            </div>
 <!-- 详情模态框 -->
 <div class="modal fade" id="reviewDetailModal" tabindex="-1">
     <div class="modal-dialog modal-xl">
