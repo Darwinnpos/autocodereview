@@ -6,58 +6,62 @@
 <!-- 统计概览卡片区 -->
 <div class="row mb-4">
     <div class="col-md-3">
-        <div class="card bg-primary text-white">
+        <div class="card text-white bg-primary">
             <div class="card-body">
                 <div class="d-flex justify-content-between">
                     <div>
-                        <h6 class="card-title">总审查次数</h6>
-                        <h3 id="totalReviews">--</h3>
+                        <h5 class="card-title">审查次数</h5>
+                        <h2 id="totalReviews">-</h2>
                     </div>
-                    <i class="bi bi-file-earmark-code display-6"></i>
+                    <div class="align-self-center">
+                        <i class="bi bi-file-earmark-code-fill fs-1"></i>
+                    </div>
                 </div>
-                <small id="totalReviewsPeriod">最近30天</small>
             </div>
         </div>
     </div>
     <div class="col-md-3">
-        <div class="card bg-success text-white">
+        <div class="card text-white bg-success">
             <div class="card-body">
                 <div class="d-flex justify-content-between">
                     <div>
-                        <h6 class="card-title">成功率</h6>
-                        <h3 id="successRate">--%</h3>
+                        <h5 class="card-title">成功率</h5>
+                        <h2 id="successRate">-%</h2>
                     </div>
-                    <i class="bi bi-check-circle display-6"></i>
+                    <div class="align-self-center">
+                        <i class="bi bi-check-circle-fill fs-1"></i>
+                    </div>
                 </div>
-                <small>完成/总数</small>
             </div>
         </div>
     </div>
     <div class="col-md-3">
-        <div class="card bg-warning text-white">
+        <div class="card text-white bg-warning">
             <div class="card-body">
                 <div class="d-flex justify-content-between">
                     <div>
-                        <h6 class="card-title">发现问题</h6>
-                        <h3 id="totalIssues">--</h3>
+                        <h5 class="card-title">发现问题</h5>
+                        <h2 id="totalIssues">-</h2>
                     </div>
-                    <i class="bi bi-bug display-6"></i>
+                    <div class="align-self-center">
+                        <i class="bi bi-bug-fill fs-1"></i>
+                    </div>
                 </div>
-                <small>累计问题数</small>
             </div>
         </div>
     </div>
     <div class="col-md-3">
-        <div class="card bg-info text-white">
+        <div class="card text-white bg-info">
             <div class="card-body">
                 <div class="d-flex justify-content-between">
                     <div>
-                        <h6 class="card-title">评论发布</h6>
-                        <h3 id="commentsPosted">--</h3>
+                        <h5 class="card-title">评论发布</h5>
+                        <h2 id="commentsPosted">-</h2>
                     </div>
-                    <i class="bi bi-chat-dots display-6"></i>
+                    <div class="align-self-center">
+                        <i class="bi bi-chat-dots-fill fs-1"></i>
+                    </div>
                 </div>
-                <small>已发布评论</small>
             </div>
         </div>
     </div>
@@ -252,9 +256,6 @@ class ReviewHistoryManager {
         document.getElementById('successRate').textContent = (stats.success_rate || 0) + '%';
         document.getElementById('totalIssues').textContent = stats.total_issues || 0;
         document.getElementById('commentsPosted').textContent = stats.comments_posted || 0;
-
-        // 设置固定的时间范围显示
-        document.getElementById('totalReviewsPeriod').textContent = '所有时间';
     }
 
     renderReviewsTable(reviews) {

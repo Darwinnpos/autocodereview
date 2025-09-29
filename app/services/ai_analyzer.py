@@ -255,9 +255,7 @@ class AICodeAnalyzer:
                     'role': 'user',
                     'content': prompt
                 }
-            ],
-            'temperature': 0.1,  # 降低随机性，提高一致性
-            'max_tokens': 2000
+            ]
         }
 
         response = requests.post(url, json=data, headers=headers, timeout=30)

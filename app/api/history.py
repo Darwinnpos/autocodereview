@@ -64,12 +64,11 @@ def get_statistics():
 
         # 所有用户都只能查看自己的统计（管理员使用独立的admin控制台）
         user_id, role = get_user_info(user)
-        user_numeric_id = user_id
         username = user.username if hasattr(user, 'username') else user.get('username', '')
 
-        # 获取统计数据
+        # 获取统计数据（只使用用户名格式）
         stats = review_db.get_review_statistics(
-            user_id=user_id,
+            user_id=username,
             days=days,
             start_date=start_date,
             end_date=end_date
@@ -93,9 +92,9 @@ def get_statistics():
                 time_condition = "1=1"
                 time_params = []
 
-            # 用户条件（匹配数字ID和用户名两种格式）
-            user_condition = "(r.user_id = ? OR r.user_id = ?)"
-            user_params = [user_numeric_id, username]
+            # 用户条件（只使用用户名格式）
+            user_condition = "r.user_id = ?"
+            user_params = [username]
 
             # 查询评论发布统计
             query = f"""
@@ -148,16 +147,15 @@ def get_reviews():
 
         # 所有用户都只能查看自己的记录（管理员使用独立的admin控制台）
         user_id, role = get_user_info(user)
-        user_numeric_id = user_id
         username = user.username if hasattr(user, 'username') else user.get('username', '')
 
         # 构建查询条件
         conditions = []
         params = []
 
-        # 用户条件（匹配数字ID和用户名两种格式）
-        conditions.append("(user_id = ? OR user_id = ?)")
-        params.extend([user_numeric_id, username])
+        # 用户条件（只使用用户名格式）
+        conditions.append("user_id = ?")
+        params.append(username)
 
         # 时间条件
         if start_date and end_date:
@@ -253,15 +251,12 @@ def get_trend_data():
 
         # 所有用户都只能查看自己的趋势（管理员使用独立的admin控制台）
         user_id, role = get_user_info(user)
-        user_numeric_id = user_id
         username = user.username if hasattr(user, 'username') else user.get('username', '')
-        # 对于趋势数据，我们需要传递一个能匹配两种格式的用户ID
-        trend_user_id = user_numeric_id
 
-        # 获取趋势数据
+        # 获取趋势数据（只使用用户名格式）
         trend_data = review_db.get_daily_review_trend(
             days=days,
-            user_id=trend_user_id,
+            user_id=username,
             start_date=start_date,
             end_date=end_date
         )
@@ -295,7 +290,7 @@ def get_review_detail(review_id):
         # 权限检查（所有用户只能查看自己的记录）
         user_id, role = get_user_info(user)
         username = user.username if hasattr(user, 'username') else user.get('username', '')
-        if review['user_id'] != user_id and review['user_id'] != username:
+        if review['user_id'] != username:
             return jsonify({'success': False, 'error': '权限不足'})
 
         # 获取相关的问题记录
@@ -331,7 +326,7 @@ def delete_review(review_id):
         # 权限检查（所有用户只能删除自己的记录）
         user_id, role = get_user_info(user)
         username = user.username if hasattr(user, 'username') else user.get('username', '')
-        if review['user_id'] != user_id and review['user_id'] != username:
+        if review['user_id'] != username:
             return jsonify({'success': False, 'error': '权限不足'})
 
         # 删除记录
