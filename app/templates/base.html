@@ -177,7 +177,7 @@
     <footer class="bg-light text-center py-3 mt-5">
         <div class="container">
             <p class="text-muted mb-0">
-                &copy; 2025 AutoCodeReview - 自动化代码审查系统
+                &copy; 2025 AutoCodeReview - 自动化代码审查系统 <span id="app-version">v0.1.0</span>
             </p>
         </div>
     </footer>
@@ -197,9 +197,10 @@
     let onConfirmCallback = null;
     let onCancelCallback = null;
 
-    // 页面加载时检查登录状态
+    // 页面加载时检查登录状态和版本信息
     document.addEventListener('DOMContentLoaded', function() {
         checkLoginStatus();
+        loadVersionInfo();
     });
 
     async function checkLoginStatus() {
@@ -266,6 +267,24 @@
             }
         } catch (error) {
             console.error('退出登录失败:', error);
+        }
+    }
+
+    // 加载版本信息
+    async function loadVersionInfo() {
+        try {
+            const response = await axios.get('/api/version');
+            if (response.data && response.data.success) {
+                const versionInfo = response.data.data;
+                const versionElement = document.getElementById('app-version');
+                if (versionElement) {
+                    versionElement.textContent = `v${versionInfo.version}`;
+                    versionElement.title = `Commit: ${versionInfo.commit} (${versionInfo.branch})`;
+                }
+            }
+        } catch (error) {
+            // 版本信息加载失败不影响主要功能，静默处理
+            console.debug('Failed to load version info:', error);
         }
     }
 

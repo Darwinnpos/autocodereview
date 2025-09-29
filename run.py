@@ -4,6 +4,7 @@ import os
 import sys
 import logging
 from app import create_app
+from app.version import get_full_version_info
 
 # Mn��
 logging.basicConfig(
@@ -23,11 +24,18 @@ def main():
     port = int(os.environ.get('PORT', 5000))
     debug = config_name == 'development'
 
-    print(f"Starting AutoCodeReview Server...")
+    # 获取版本信息
+    version_info = get_full_version_info()
+
+    print("=" * 50)
+    print(f"AutoCodeReview Server v{version_info['version']}")
+    print(f"Commit: {version_info['commit']} ({version_info['branch']})")
+    print("=" * 50)
     print(f"Environment: {config_name}")
     print(f"Host: {host}")
     print(f"Port: {port}")
     print(f"Debug: {debug}")
+    print("=" * 50)
 
     # /��(
     app.run(

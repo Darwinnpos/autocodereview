@@ -26,11 +26,13 @@ def create_app(config_name='default'):
     from app.api.auth import bp as auth_bp
     from app.api.history import history_bp
     from app.api.admin import admin_bp
+    from app.api.version import bp as version_bp
 
     app.register_blueprint(review_bp, url_prefix='/api')
     app.register_blueprint(auth_bp, url_prefix='/api')
     app.register_blueprint(history_bp)
     app.register_blueprint(admin_bp)
+    app.register_blueprint(version_bp)
     # 注意：config_bp已废弃，配置功能已迁移到auth API
 
     # 初始化数据库连接池
@@ -52,10 +54,16 @@ def create_app(config_name='default'):
     def internal_error(error):
         return {'error': 'Internal server error'}, 500
 
-    # 健康检查端点
+    # 健康检查端点（保持向后兼容）
     @app.route('/health')
     def health_check():
-        return {'status': 'healthy', 'service': 'autocodereview'}
+        from app.version import get_full_version_info
+        version_info = get_full_version_info()
+        return {
+            'status': 'healthy',
+            'service': 'AutoCodeReview',
+            'version': version_info['version']
+        }
 
     # Web界面路由
     @app.route('/')
