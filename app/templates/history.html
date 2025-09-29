@@ -109,11 +109,12 @@
                             <thead class="table-light">
                                 <tr>
                                     <th width="5%" class="text-center">#</th>
-                                    <th width="20%">项目信息</th>
-                                    <th width="25%">MR信息</th>
-                                    <th width="15%">分析结果</th>
+                                    <th width="18%">项目信息</th>
+                                    <th width="22%">MR信息</th>
+                                    <th width="13%">分析结果</th>
+                                    <th width="8%">评论</th>
                                     <th width="12%">状态</th>
-                                    <th width="13%">时间</th>
+                                    <th width="12%">时间</th>
                                     <th width="10%" class="text-center">操作</th>
                                 </tr>
                             </thead>
@@ -511,10 +512,10 @@ class ReviewHistoryManager {
         const projectShort = projectInfo.length > 20 ?
             projectInfo.substring(0, 20) + '...' : projectInfo;
 
-        // MR信息
+        // MR信息 (增加显示长度)
         const mrTitle = review.mr_title || '未知标题';
-        const mrTitleShort = mrTitle.length > 30 ?
-            mrTitle.substring(0, 30) + '...' : mrTitle;
+        const mrTitleShort = mrTitle.length > 45 ?
+            mrTitle.substring(0, 45) + '...' : mrTitle;
 
         tr.innerHTML = `
             <td class="text-center">${rowNumber}</td>
@@ -542,6 +543,12 @@ class ReviewHistoryManager {
                             <span class="badge bg-info">${review.info_count || 0}</span>
                         </div>
                     ` : ''}
+                </div>
+            </td>
+            <td class="text-center">
+                <div class="small">
+                    <span class="badge bg-success">${review.comments_posted || 0}</span>
+                    <div class="text-muted mt-1">已发布</div>
                 </div>
             </td>
             <td>
