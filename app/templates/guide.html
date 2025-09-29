@@ -189,7 +189,7 @@
                                 <div class="card-body text-center">
                                     <i class="bi bi-chat-square-text text-info" style="font-size: 2rem;"></i>
                                     <h5 class="card-title mt-3">智能评论</h5>
-                                    <p class="card-text">自动生成专业的代码审查评论</p>
+                                    <p class="card-text">自动生成专业评论，一键提交到GitLab MR</p>
                                 </div>
                             </div>
                         </div>
@@ -519,27 +519,41 @@ Select scopes:
                             <strong>在 AutoCodeReview 中配置 AI</strong>
                         </div>
                         <div class="card-body">
-                            <div class="row">
+                            <h6>步骤一：填写基本信息</h6>
+                            <div class="row mb-3">
                                 <div class="col-md-6">
-                                    <h6>AI API URL</h6>
+                                    <strong>AI API URL</strong>
                                     <div class="code-example">http://ai.hzcctech.com/openai</div>
-
-                                    <h6>AI API 密钥</h6>
-                                    <div class="code-example">sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx</div>
-
-                                    <h6>AI 模型</h6>
-                                    <div class="code-example">qwen3-coder-480b-a35b</div>
-
-                                    <div class="alert alert-tip mt-3">
-                                        <h6><i class="bi bi-lightbulb"></i> 模型选择建议</h6>
-                                        <ul class="mb-0">
-                                            <li><strong>qwen3-coder-480b-a35b：</strong>专门针对代码分析优化的模型，推荐使用</li>
-                                            <li><strong>其他兼容模型：</strong>支持 OpenAI API 格式的大语言模型</li>
-                                            <li>可在配置页面的"AI配置"选项卡中点击"探测"按钮自动发现可用模型</li>
-                                            <li>选择模型后建议点击"测试AI连接"验证配置正确性</li>
-                                        </ul>
-                                    </div>
                                 </div>
+                                <div class="col-md-6">
+                                    <strong>AI API 密钥</strong>
+                                    <div class="code-example">sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx</div>
+                                </div>
+                            </div>
+
+                            <h6>步骤二：探测可用模型</h6>
+                            <ol>
+                                <li>填写完API URL和密钥后</li>
+                                <li>点击 <strong>"探测"</strong> 按钮</li>
+                                <li>系统会自动连接API并获取可用模型列表</li>
+                                <li>探测成功后下拉菜单会显示所有可用模型</li>
+                            </ol>
+
+                            <h6>步骤三：选择和保存模型</h6>
+                            <ol>
+                                <li>从下拉菜单中选择合适的模型</li>
+                                <li>推荐选择：<code>qwen3-coder-480b-a35b</code> (代码分析专用)</li>
+                                <li>点击 <strong>"保存AI配置"</strong> 按钮</li>
+                                <li>（可选）点击 <strong>"测试AI连接"</strong> 验证配置</li>
+                            </ol>
+
+                            <div class="alert alert-warning">
+                                <h6><i class="bi bi-exclamation-triangle"></i> 重要提示</h6>
+                                <ul class="mb-0">
+                                    <li><strong>必须先探测模型</strong>：直接填写模型名称可能无效</li>
+                                    <li><strong>确保网络畅通</strong>：探测过程需要连接到AI服务</li>
+                                    <li><strong>验证API密钥</strong>：密钥错误会导致探测失败</li>
+                                </ul>
                             </div>
                         </div>
                     </div>
@@ -588,15 +602,27 @@ Select scopes:
                                     <strong>AI 配置验证</strong>
                                 </div>
                                 <div class="card-body">
-                                    <h6>方法一：通过界面测试</h6>
-                                    <p>提交一个测试 MR URL 进行代码审查，观察是否能正常分析代码。</p>
+                                    <ol>
+                                        <li>填写完 AI 相关配置后</li>
+                                        <li>点击 "探测" 按钮发现可用模型</li>
+                                        <li>选择模型后点击 "测试AI连接" 按钮</li>
+                                        <li>系统会验证API连接和模型可用性</li>
+                                    </ol>
 
-                                    <h6>方法二：检查日志</h6>
-                                    <div class="code-example">
-# 查看应用日志
-docker logs autocodereview
+                                    <div class="alert alert-success">
+                                        <strong>成功示例：</strong>AI API连接测试成功！
+                                    </div>
 
-# 或直接运行时查看控制台输出</div>
+                                    <div class="alert alert-danger">
+                                        <strong>失败示例：</strong>
+                                        <ul class="mb-0">
+                                            <li>HTTP 401 → 检查API密钥是否正确</li>
+                                            <li>HTTP 403 → 检查API密钥权限</li>
+                                            <li>HTTP 404 → 检查API URL和模型名称</li>
+                                            <li>Connection failed → 检查网络连接</li>
+                                        </ul>
+                                    </div>
+
                                 </div>
                             </div>
                         </div>
