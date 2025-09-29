@@ -449,8 +449,21 @@ def get_review_result(review_id: int):
     try:
         result = review_service.get_review_final_result(review_id)
 
+        # 如果结果为None，检查审查记录是否存在以及状态
         if result is None:
-            return jsonify({'error': '审查记录不存在'}), 404
+            # 检查审查记录是否存在
+            review = review_service.db.get_review_record(review_id)
+            if not review:
+                return jsonify({'error': '审查记录不存在'}), 404
+            
+            # 如果审查失败，返回具体的错误信息
+            if review.get('status') == 'failed':
+                error_message = review.get('error_message', '审查失败')
+                return jsonify({'error': error_message}), 400
+                
+            # 如果审查还未完成
+            if review.get('status') != 'completed':
+                return jsonify({'error': f'审查尚未完成，当前状态：{review.get("status")}'}) , 400
 
         return jsonify({
             'success': True,

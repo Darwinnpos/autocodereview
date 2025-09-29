@@ -347,6 +347,25 @@ function startProgressPolling(reviewId) {
             }
         } catch (error) {
             console.error('获取进度失败:', error);
+            // 如果是客户端错误或网络错误，停止轮询
+            if (error.response && error.response.status === 400) {
+                console.log('审查已失败，停止轮询');
+                clearInterval(reviewProgressInterval);
+                reviewProgressInterval = null;
+                currentReviewIdForCancel = null;
+                unlockPage();
+                // 恢复按钮状态
+                const submitBtn = document.querySelector('button[type="submit"]');
+                if (submitBtn) {
+                    submitBtn.innerHTML = '<i class="bi bi-play"></i> 开始审查';
+                    submitBtn.disabled = false;
+                }
+                // 隐藏取消按钮
+                const cancelBtn = document.getElementById('cancelReviewBtn');
+                if (cancelBtn) {
+                    cancelBtn.style.display = 'none';
+                }
+            }
         }
     }, 5000); // 每5秒轮询一次，减少频率
 }
