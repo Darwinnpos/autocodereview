@@ -113,10 +113,10 @@
                                     <th width="18%">项目信息</th>
                                     <th width="22%">MR信息</th>
                                     <th width="13%">分析结果</th>
-                                    <th width="8%">评论</th>
+                                    <th width="10%" class="text-center">评论</th>
                                     <th width="12%">状态</th>
                                     <th width="12%">时间</th>
-                                    <th width="10%" class="text-center">操作</th>
+                                    <th width="8%" class="text-center">操作</th>
                                 </tr>
                             </thead>
                             <tbody id="reviewsTableBody">
@@ -279,33 +279,9 @@ class ReviewHistoryManager {
     }
 
     initEventListeners() {
-        // 筛选控件事件
-        document.getElementById('dateRange').addEventListener('change', (e) => {
-            const customRange = document.getElementById('customDateRange');
-            if (e.target.value === 'custom') {
-                customRange.style.display = 'block';
-            } else {
-                customRange.style.display = 'none';
-            }
-        });
-
-        document.getElementById('applyFiltersBtn').addEventListener('click', () => {
-            this.applyFilters();
-        });
-
-        document.getElementById('resetFiltersBtn').addEventListener('click', () => {
-            this.resetFilters();
-        });
-
+        // 只绑定存在的刷新按钮
         document.getElementById('refreshBtn').addEventListener('click', () => {
             this.loadAll();
-        });
-
-        // 搜索框回车事件
-        document.getElementById('searchInput').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                this.applyFilters();
-            }
         });
     }
 
@@ -373,14 +349,8 @@ class ReviewHistoryManager {
         document.getElementById('totalIssues').textContent = stats.total_issues || 0;
         document.getElementById('commentsPosted').textContent = stats.comments_posted || 0;
 
-        const dateRange = document.getElementById('dateRange').value;
-        let periodText = '最近30天';
-        if (dateRange === '7') periodText = '最近7天';
-        else if (dateRange === '90') periodText = '最近90天';
-        else if (dateRange === 'all') periodText = '全部时间';
-        else if (dateRange === 'custom') periodText = '自定义时间';
-
-        document.getElementById('totalReviewsPeriod').textContent = periodText;
+        // 设置固定的时间范围显示
+        document.getElementById('totalReviewsPeriod').textContent = '所有时间';
     }
 
     renderReviewsTable(reviews) {
