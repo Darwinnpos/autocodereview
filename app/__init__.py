@@ -25,10 +25,12 @@ def create_app(config_name='default'):
     from app.api.review import bp as review_bp
     from app.api.auth import bp as auth_bp
     from app.api.history import history_bp
+    from app.api.admin import admin_bp
 
     app.register_blueprint(review_bp, url_prefix='/api')
     app.register_blueprint(auth_bp, url_prefix='/api')
     app.register_blueprint(history_bp)
+    app.register_blueprint(admin_bp)
     # 注意：config_bp已废弃，配置功能已迁移到auth API
 
     # 初始化数据库连接池
@@ -81,5 +83,9 @@ def create_app(config_name='default'):
     @app.route('/profile')
     def profile_page():
         return render_template('profile.html')
+
+    @app.route('/guide')
+    def guide_page():
+        return render_template('guide.html')
 
     return app

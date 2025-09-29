@@ -1,0 +1,1073 @@
+{% extends "base.html" %}
+
+{% block title %}用户指南 - AutoCodeReview{% endblock %}
+
+{% block styles %}
+<style>
+    .guide-nav {
+        position: sticky;
+        top: 20px;
+        max-height: calc(100vh - 120px);
+        overflow-y: auto;
+    }
+
+    .guide-nav .nav-link {
+        color: #495057;
+        padding: 0.5rem 1rem;
+        border-radius: 0.375rem;
+        margin-bottom: 0.25rem;
+    }
+
+    .guide-nav .nav-link:hover {
+        background-color: #f8f9fa;
+        color: #0d6efd;
+    }
+
+    .guide-nav .nav-link.active {
+        background-color: #0d6efd;
+        color: white;
+    }
+
+    .guide-section {
+        min-height: 300px;
+        padding-top: 20px;
+        margin-bottom: 40px;
+    }
+
+    .step-card {
+        margin-bottom: 1.5rem;
+        border-left: 4px solid #0d6efd;
+    }
+
+    .step-number {
+        background: #0d6efd;
+        color: white;
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        margin-right: 10px;
+    }
+
+    .code-example {
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 0.375rem;
+        padding: 1rem;
+        margin: 1rem 0;
+        font-family: 'Courier New', monospace;
+        white-space: pre-wrap;
+    }
+
+    .alert-tip {
+        background-color: #e7f3ff;
+        border-color: #b3d9ff;
+        color: #0066cc;
+    }
+
+    .alert-warning {
+        background-color: #fff3cd;
+        border-color: #ffeaa7;
+        color: #856404;
+    }
+
+    .screenshot-placeholder {
+        background-color: #f8f9fa;
+        border: 2px dashed #dee2e6;
+        border-radius: 0.375rem;
+        padding: 2rem;
+        text-align: center;
+        color: #6c757d;
+        margin: 1rem 0;
+    }
+
+    .checklist {
+        list-style: none;
+        padding-left: 0;
+    }
+
+    .checklist li {
+        margin-bottom: 0.5rem;
+        padding-left: 1.5rem;
+        position: relative;
+    }
+
+    .checklist li:before {
+        content: "✓";
+        position: absolute;
+        left: 0;
+        color: #28a745;
+        font-weight: bold;
+    }
+
+    .back-to-top {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background: #0d6efd;
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 50px;
+        height: 50px;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        z-index: 1000;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    }
+
+    .back-to-top:hover {
+        background: #0056b3;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <!-- 左侧导航 -->
+        <div class="col-md-3">
+            <div class="guide-nav">
+                <h5 class="mb-3">
+                    <i class="bi bi-book"></i>
+                    用户指南目录
+                </h5>
+                <nav class="nav flex-column">
+                    <a class="nav-link active" href="#overview">系统概述</a>
+                    <a class="nav-link" href="#gitlab-config">GitLab 配置</a>
+                    <a class="nav-link" href="#review-config">审查配置</a>
+                    <a class="nav-link" href="#ai-config">AI 配置</a>
+                    <a class="nav-link" href="#config-test">配置验证</a>
+                    <a class="nav-link" href="#how-to-review">如何进行代码审查</a>
+                    <a class="nav-link" href="#review-workflow">完整工作流程</a>
+                    <a class="nav-link" href="#best-practices">最佳实践</a>
+                    <a class="nav-link" href="#troubleshooting">常见问题</a>
+                </nav>
+            </div>
+        </div>
+
+        <!-- 右侧内容 -->
+        <div class="col-md-9">
+            <div class="guide-content">
+                <!-- 系统概述 -->
+                <section id="overview" class="guide-section">
+                    <h1 class="display-6 mb-4">
+                        <i class="bi bi-lightbulb"></i>
+                        AutoCodeReview 用户指南
+                    </h1>
+                    <p class="lead">
+                        AutoCodeReview 是一个自动化代码审查系统，通过集成 GitLab 和 AI 技术，
+                        为您的代码合并请求提供智能分析和建议。
+                    </p>
+
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="card h-100">
+                                <div class="card-body text-center">
+                                    <i class="bi bi-git text-warning" style="font-size: 2rem;"></i>
+                                    <h5 class="card-title mt-3">GitLab 集成</h5>
+                                    <p class="card-text">直接对接 GitLab，自动获取 MR 变更内容</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card h-100">
+                                <div class="card-body text-center">
+                                    <i class="bi bi-robot text-success" style="font-size: 2rem;"></i>
+                                    <h5 class="card-title mt-3">AI 智能分析</h5>
+                                    <p class="card-text">基于大语言模型进行代码质量分析</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card h-100">
+                                <div class="card-body text-center">
+                                    <i class="bi bi-chat-square-text text-info" style="font-size: 2rem;"></i>
+                                    <h5 class="card-title mt-3">智能评论</h5>
+                                    <p class="card-text">自动生成专业的代码审查评论</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- GitLab 配置 -->
+                <section id="gitlab-config" class="guide-section">
+                    <h2 class="mb-4">
+                        <i class="bi bi-gear-fill"></i>
+                        GitLab 配置
+                    </h2>
+
+                    <div class="step-card card">
+                        <div class="card-header">
+                            <span class="step-number">1</span>
+                            <strong>获取 GitLab 访问令牌</strong>
+                        </div>
+                        <div class="card-body">
+                            <h6>步骤一：登录 GitLab</h6>
+                            <ol>
+                                <li>登录到您的 GitLab 实例（http://gitlab.hzcctech.com）</li>
+                                <li>点击右上角头像，选择 "Preferences"</li>
+                            </ol>
+
+                            <h6 class="mt-3">步骤二：创建个人访问令牌</h6>
+                            <ol>
+                                <li>在左侧导航栏中，点击 "Access Tokens/访问令牌"</li>
+                                <li>填写令牌信息：</li>
+                            </ol>
+
+                            <div class="code-example">
+Token name: AutoCodeReview
+Expiration date: 设置合适的过期时间（建议不超过1年）
+Select scopes:
+  ☑ api - 完整 API 访问权限
+  ☑ read_repository - 读取代码库
+  ☑ write_repository - 写入评论权限</div>
+
+                            <div class="alert alert-warning">
+                                <i class="bi bi-exclamation-triangle"></i>
+                                <strong>重要：</strong>立即复制生成的令牌，页面刷新后将无法再次查看
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="step-card card">
+                        <div class="card-header">
+                            <span class="step-number">2</span>
+                            <strong>在系统中配置 GitLab</strong>
+                        </div>
+                        <div class="card-body">
+                            <ol>
+                                <li>登录 AutoCodeReview 系统</li>
+                                <li>点击右上角用户名，选择 "个人资料"</li>
+                                <li>在配置页面中填写以下信息：</li>
+                            </ol>
+
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6>GitLab URL</h6>
+                                    <div class="code-example">http://gitlab.hzcctech.com</div>
+
+                                    <h6>访问令牌</h6>
+                                    <div class="code-example">glpat-xxxxxxxxxxxxxxxxxxxx</div>
+
+                                    <h6>审查者名称</h6>
+                                    <div class="code-example">AutoCodeReview Bot</div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="screenshot-placeholder">
+                                        <i class="bi bi-image" style="font-size: 2rem;"></i>
+                                        <p>配置页面截图位置</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 审查配置 -->
+                <section id="review-config" class="guide-section">
+                    <h2 class="mb-4">
+                        <i class="bi bi-list-check"></i>
+                        审查配置
+                    </h2>
+
+                    <div class="alert alert-tip">
+                        <h6><i class="bi bi-info-circle"></i> 审查配置说明</h6>
+                        <p class="mb-0">
+                            审查配置决定了代码审查的严格程度和检查项目。您可以根据团队需求和项目特点，
+                            灵活调整这些配置以获得最合适的审查结果。
+                        </p>
+                    </div>
+
+                    <div class="step-card card">
+                        <div class="card-header">
+                            <span class="step-number">1</span>
+                            <strong>设置审查严重程度等级</strong>
+                        </div>
+                        <div class="card-body">
+                            <p>系统提供三种审查严重程度等级，不同等级会过滤不同严重程度的问题：</p>
+
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="card border-success h-100">
+                                        <div class="card-body text-center p-3">
+                                            <h6 class="text-success"><strong>严格模式</strong></h6>
+                                            <p class="small text-muted">
+                                                检查所有严重程度的问题<br>
+                                                包括：错误、警告、建议
+                                            </p>
+                                            <div class="badge bg-success">全面检查</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="card border-primary h-100">
+                                        <div class="card-body text-center p-3">
+                                            <h6 class="text-primary">
+                                                <strong>标准模式</strong>
+                                                <span class="badge bg-primary small">推荐</span>
+                                            </h6>
+                                            <p class="small text-muted">
+                                                检查重要问题<br>
+                                                包括：错误、警告
+                                            </p>
+                                            <div class="badge bg-primary">平衡选择</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="card border-warning h-100">
+                                        <div class="card-body text-center p-3">
+                                            <h6 class="text-warning"><strong>宽松模式</strong></h6>
+                                            <p class="small text-muted">
+                                                只检查严重问题<br>
+                                                包括：错误
+                                            </p>
+                                            <div class="badge bg-warning">快速检查</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="alert alert-warning mt-3">
+                                <strong>选择建议：</strong>
+                                <ul class="mb-0">
+                                    <li><strong>新项目或重要项目</strong>：建议使用严格模式，确保代码质量</li>
+                                    <li><strong>日常开发</strong>：推荐使用标准模式，平衡效率和质量</li>
+                                    <li><strong>紧急修复</strong>：可使用宽松模式，关注核心问题</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="step-card card">
+                        <div class="card-header">
+                            <span class="step-number">2</span>
+                            <strong>详细检查选项配置</strong>
+                        </div>
+                        <div class="card-body">
+                            <h6>核心质量检查</h6>
+                            <p class="text-muted small">以下检查项目建议保持启用，确保代码基础质量：</p>
+
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <ul class="list-group list-group-flush">
+                                        <li class="list-group-item d-flex align-items-center">
+                                            <i class="bi bi-bug text-danger me-2"></i>
+                                            <div>
+                                                <strong>语法错误</strong>
+                                                <small class="text-muted d-block">检查代码语法问题</small>
+                                            </div>
+                                        </li>
+                                        <li class="list-group-item d-flex align-items-center">
+                                            <i class="bi bi-exclamation-triangle text-warning me-2"></i>
+                                            <div>
+                                                <strong>逻辑错误</strong>
+                                                <small class="text-muted d-block">识别潜在逻辑问题</small>
+                                            </div>
+                                        </li>
+                                        <li class="list-group-item d-flex align-items-center">
+                                            <i class="bi bi-shield-exclamation text-danger me-2"></i>
+                                            <div>
+                                                <strong>安全漏洞</strong>
+                                                <small class="text-muted d-block">检测安全风险</small>
+                                            </div>
+                                        </li>
+                                    </ul>
+                                </div>
+                                <div class="col-md-6">
+                                    <ul class="list-group list-group-flush">
+                                        <li class="list-group-item d-flex align-items-center">
+                                            <i class="bi bi-speedometer2 text-info me-2"></i>
+                                            <div>
+                                                <strong>性能优化</strong>
+                                                <small class="text-muted d-block">识别性能改进点</small>
+                                            </div>
+                                        </li>
+                                        <li class="list-group-item d-flex align-items-center">
+                                            <i class="bi bi-palette text-secondary me-2"></i>
+                                            <div>
+                                                <strong>代码风格</strong>
+                                                <small class="text-muted d-block">检查编码规范</small>
+                                            </div>
+                                        </li>
+                                        <li class="list-group-item d-flex align-items-center">
+                                            <i class="bi bi-star text-success me-2"></i>
+                                            <div>
+                                                <strong>最佳实践</strong>
+                                                <small class="text-muted d-block">推荐改进建议</small>
+                                            </div>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <h6 class="mt-4">可选检查项</h6>
+                            <p class="text-muted small">可根据项目需求选择性启用：</p>
+
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <ul class="list-unstyled">
+                                        <li class="mb-2">
+                                            <i class="bi bi-chat-square-text text-primary me-1"></i>
+                                            <small>注释完整性</small>
+                                        </li>
+                                        <li class="mb-2">
+                                            <i class="bi bi-book text-info me-1"></i>
+                                            <small>文档建议</small>
+                                        </li>
+                                    </ul>
+                                </div>
+                                <div class="col-md-3">
+                                    <ul class="list-unstyled">
+                                        <li class="mb-2">
+                                            <i class="bi bi-eye text-success me-1"></i>
+                                            <small>可读性检查</small>
+                                        </li>
+                                        <li class="mb-2">
+                                            <i class="bi bi-tags text-warning me-1"></i>
+                                            <small>命名规范</small>
+                                        </li>
+                                    </ul>
+                                </div>
+                                <div class="col-md-3">
+                                    <ul class="list-unstyled">
+                                        <li class="mb-2">
+                                            <i class="bi bi-check-circle text-primary me-1"></i>
+                                            <small>测试覆盖率</small>
+                                        </li>
+                                        <li class="mb-2">
+                                            <i class="bi bi-gear text-secondary me-1"></i>
+                                            <small>可维护性</small>
+                                        </li>
+                                    </ul>
+                                </div>
+                                <div class="col-md-3">
+                                    <ul class="list-unstyled">
+                                        <li class="mb-2">
+                                            <i class="bi bi-diagram-3 text-danger me-1"></i>
+                                            <small>复杂度分析</small>
+                                        </li>
+                                        <li class="mb-2">
+                                            <i class="bi bi-arrow-repeat text-info me-1"></i>
+                                            <small>代码重用性</small>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="step-card card">
+                        <div class="card-header">
+                            <span class="step-number">3</span>
+                            <strong>保存审查配置</strong>
+                        </div>
+                        <div class="card-body">
+                            <ol>
+                                <li>在配置管理页面点击"审查配置"选项卡</li>
+                                <li>选择合适的审查严重程度等级</li>
+                                <li>根据项目需求勾选或取消相应的检查项</li>
+                                <li>使用"全选/全不选"快速操作</li>
+                                <li>点击"保存配置"按钮</li>
+                            </ol>
+
+                            <div class="alert alert-tip">
+                                <h6><i class="bi bi-lightbulb"></i> 配置技巧</h6>
+                                <ul class="mb-0">
+                                    <li><strong>核心检查项</strong>建议始终保持启用</li>
+                                    <li>可选检查项可根据团队编码规范灵活调整</li>
+                                    <li>不同项目可以设置不同的检查严格程度</li>
+                                    <li>配置保存后立即生效，无需重启</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- AI 配置 -->
+                <section id="ai-config" class="guide-section">
+                    <h2 class="mb-4">
+                        <i class="bi bi-cpu"></i>
+                        AI 配置（通过 OpenWebUI）
+                    </h2>
+
+                    <div class="step-card card">
+                        <div class="card-header">
+                            <span class="step-number">1</span>
+                            <strong>在 OpenWebUI 中配置 AI 模型</strong>
+                        </div>
+                        <div class="card-body">
+                            <h6>获取 API 密钥</h6>
+                            <ol>
+                                <li>在 OpenWebUI 中，进入 "Settings" → "Account"</li>
+                                <li>在 "API Keys" 部分，点击 "Create API Key"</li>
+                                <li>复制生成的 API 密钥</li>
+                            </ol>
+                        </div>
+                    </div>
+
+                    <div class="step-card card">
+                        <div class="card-header">
+                            <span class="step-number">2</span>
+                            <strong>在 AutoCodeReview 中配置 AI</strong>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6>AI API URL</h6>
+                                    <div class="code-example">http://ai.hzcctech.com/openai</div>
+
+                                    <h6>AI API 密钥</h6>
+                                    <div class="code-example">sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx</div>
+
+                                    <h6>AI 模型</h6>
+                                    <div class="code-example">qwen3-coder-480b-a35b</div>
+
+                                    <div class="alert alert-tip mt-3">
+                                        <h6><i class="bi bi-lightbulb"></i> 模型选择建议</h6>
+                                        <ul class="mb-0">
+                                            <li><strong>qwen3-coder-480b-a35b：</strong>专门针对代码分析优化的模型，推荐使用</li>
+                                            <li><strong>其他兼容模型：</strong>支持 OpenAI API 格式的大语言模型</li>
+                                            <li>可在配置页面的"AI配置"选项卡中点击"探测"按钮自动发现可用模型</li>
+                                            <li>选择模型后建议点击"测试AI连接"验证配置正确性</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 配置验证 -->
+                <section id="config-test" class="guide-section">
+                    <h2 class="mb-4">
+                        <i class="bi bi-check-circle"></i>
+                        配置验证
+                    </h2>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <i class="bi bi-gitlab"></i>
+                                    <strong>GitLab 连接测试</strong>
+                                </div>
+                                <div class="card-body">
+                                    <ol>
+                                        <li>填写完 GitLab 相关配置后</li>
+                                        <li>点击 "测试 GitLab 连接" 按钮</li>
+                                        <li>系统会验证连接状态</li>
+                                    </ol>
+
+                                    <div class="alert alert-success">
+                                        <strong>成功示例：</strong>GitLab连接测试成功
+                                    </div>
+
+                                    <div class="alert alert-danger">
+                                        <strong>失败示例：</strong>
+                                        <ul class="mb-0">
+                                            <li>401 Unauthorized → 检查访问令牌</li>
+                                            <li>403 Forbidden → 检查令牌权限</li>
+                                            <li>404 Not Found → 检查 URL</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <i class="bi bi-robot"></i>
+                                    <strong>AI 配置验证</strong>
+                                </div>
+                                <div class="card-body">
+                                    <h6>方法一：通过界面测试</h6>
+                                    <p>提交一个测试 MR URL 进行代码审查，观察是否能正常分析代码。</p>
+
+                                    <h6>方法二：检查日志</h6>
+                                    <div class="code-example">
+# 查看应用日志
+docker logs autocodereview
+
+# 或直接运行时查看控制台输出</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 如何进行代码审查 -->
+                <section id="how-to-review" class="guide-section">
+                    <h2 class="mb-4">
+                        <i class="bi bi-search"></i>
+                        如何使用 AutoCodeReview 进行代码审查
+                    </h2>
+
+                    <div class="alert alert-tip">
+                        <h6><i class="bi bi-info-circle"></i> 前置条件</h6>
+                        <ul class="checklist">
+                            <li>已完成 GitLab 配置并测试连接成功</li>
+                            <li>已完成 AI 配置并能正常工作</li>
+                            <li>拥有目标 GitLab 项目的访问权限</li>
+                            <li>MR 处于可审查状态</li>
+                        </ul>
+                    </div>
+
+                    <div class="step-card card">
+                        <div class="card-header">
+                            <span class="step-number">1</span>
+                            <strong>获取 MR URL</strong>
+                        </div>
+                        <div class="card-body">
+                            <h6>从 GitLab 获取 MR URL</h6>
+                            <ol>
+                                <li>打开 GitLab 项目页面</li>
+                                <li>进入 "Merge requests" 页面</li>
+                                <li>找到需要审查的 MR，点击进入详情页</li>
+                                <li>复制浏览器地址栏中的完整 URL</li>
+                            </ol>
+
+                            <h6>MR URL 格式示例</h6>
+                            <div class="code-example">
+https://gitlab.com/username/project/-/merge_requests/123
+https://your-gitlab-domain.com/group/project/-/merge_requests/456</div>
+
+                            <div class="alert alert-warning">
+                                <strong>注意事项：</strong>
+                                <ul class="mb-0">
+                                    <li>URL 必须包含完整的协议（http:// 或 https://）</li>
+                                    <li>确保 MR 编号正确</li>
+                                    <li>可以直接复制浏览器地址栏的 URL</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="step-card card">
+                        <div class="card-header">
+                            <span class="step-number">2</span>
+                            <strong>启动代码审查</strong>
+                        </div>
+                        <div class="card-body">
+                            <ol>
+                                <li>登录 AutoCodeReview 系统</li>
+                                <li>在首页找到 "代码审查" 区域</li>
+                                <li>在 "Merge Request URL" 输入框中粘贴 MR URL</li>
+                                <li>（可选）点击 "验证 URL 格式" 按钮进行验证</li>
+                                <li>点击 "开始审查" 按钮</li>
+                                <li>记录显示的审查 ID，用于后续跟踪进度</li>
+                            </ol>
+                        </div>
+                    </div>
+
+                    <div class="step-card card">
+                        <div class="card-header">
+                            <span class="step-number">3</span>
+                            <strong>跟踪审查进度</strong>
+                        </div>
+                        <div class="card-body">
+                            <h6>实时进度监控</h6>
+                            <p>系统会自动跳转到进度页面，或者手动输入审查 ID 查看进度。</p>
+
+                            <h6>审查阶段说明</h6>
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <div class="text-center">
+                                        <i class="bi bi-gear text-warning" style="font-size: 2rem;"></i>
+                                        <h6>准备阶段</h6>
+                                        <p class="small">获取 MR 信息和文件变更列表</p>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="text-center">
+                                        <i class="bi bi-search text-info" style="font-size: 2rem;"></i>
+                                        <h6>分析阶段</h6>
+                                        <p class="small">逐个分析修改的代码文件</p>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="text-center">
+                                        <i class="bi bi-chat-text text-primary" style="font-size: 2rem;"></i>
+                                        <h6>生成评论</h6>
+                                        <p class="small">为发现的问题生成评论文本</p>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="text-center">
+                                        <i class="bi bi-check-circle text-success" style="font-size: 2rem;"></i>
+                                        <h6>完成阶段</h6>
+                                        <p class="small">所有分析完成，等待确认</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="step-card card">
+                        <div class="card-header">
+                            <span class="step-number">4</span>
+                            <strong>查看和确认评论</strong>
+                        </div>
+                        <div class="card-body">
+                            <h6>审查结果页面内容</h6>
+                            <ul>
+                                <li><strong>审查摘要：</strong>分析文件数、发现问题数、按严重程度分类统计</li>
+                                <li><strong>MR 信息：</strong>标题、作者、分支信息、GitLab 链接</li>
+                                <li><strong>问题分类：</strong>安全风险、语法错误、性能优化、代码风格、代码审查</li>
+                            </ul>
+
+                            <h6>评论确认操作</h6>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6><i class="bi bi-eye"></i> 单个评论确认</h6>
+                                    <ol>
+                                        <li>点击 "查看代码上下文" 查看相关代码</li>
+                                        <li>仔细阅读问题描述和建议</li>
+                                        <li>选择 "确认并发布" 或 "拒绝"</li>
+                                    </ol>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6><i class="bi bi-check-square"></i> 批量评论确认</h6>
+                                    <ol>
+                                        <li>勾选要确认的评论</li>
+                                        <li>点击 "批量确认" 按钮</li>
+                                        <li>选中的评论将一次性发布到 GitLab</li>
+                                    </ol>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="step-card card">
+                        <div class="card-header">
+                            <span class="step-number">5</span>
+                            <strong>在 GitLab 中查看评论</strong>
+                        </div>
+                        <div class="card-body">
+                            <p>点击结果页面中的 GitLab 链接，或直接访问原 MR URL，刷新页面查看新的评论。</p>
+
+                            <h6>评论显示格式</h6>
+                            <div class="code-example">
+**安全风险**: 此处存在 SQL 注入风险
+
+**建议**: 使用参数化查询来防止 SQL 注入攻击</div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 完整工作流程 -->
+                <section id="review-workflow" class="guide-section">
+                    <h2 class="mb-4">
+                        <i class="bi bi-diagram-3"></i>
+                        完整工作流程示例
+                    </h2>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <strong>场景：审查一个包含数据库操作的 Python MR</strong>
+                        </div>
+                        <div class="card-body">
+                            <div class="code-example">
+1. 开发者提交 MR：
+   https://gitlab.com/myproject/backend/-/merge_requests/45
+
+2. 审查者操作：
+   - 登录 AutoCodeReview
+   - 输入 MR URL
+   - 点击"开始审查"
+   - 获得审查 ID：123
+
+3. 系统处理：
+   - 分析 3 个修改的 Python 文件
+   - 发现 5 个问题（2个警告，3个建议）
+   - 生成 5 条评论
+
+4. 审查确认：
+   - 查看所有 5 条评论
+   - 确认其中 4 条有用的评论
+   - 拒绝 1 条误报评论
+   - 批量发布到 GitLab
+
+5. GitLab 展示：
+   - MR 页面显示 4 条新评论
+   - 开发者收到通知
+   - 根据建议修改代码</div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 最佳实践 -->
+                <section id="best-practices" class="guide-section">
+                    <h2 class="mb-4">
+                        <i class="bi bi-star"></i>
+                        最佳实践建议
+                    </h2>
+
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="card h-100">
+                                <div class="card-header">
+                                    <i class="bi bi-clock"></i>
+                                    <strong>审查时机</strong>
+                                </div>
+                                <div class="card-body">
+                                    <ul>
+                                        <li>MR 创建后，合并前进行审查</li>
+                                        <li>代码稳定后再审查，避免频繁变更</li>
+                                        <li>大型 MR 建议分批审查</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card h-100">
+                                <div class="card-header">
+                                    <i class="bi bi-check-circle"></i>
+                                    <strong>评论确认原则</strong>
+                                </div>
+                                <div class="card-body">
+                                    <ul>
+                                        <li>仔细阅读每条评论，理解问题描述</li>
+                                        <li>结合代码上下文判断评论的准确性</li>
+                                        <li>优先确认安全风险和语法错误类评论</li>
+                                        <li>对于风格类建议，结合团队规范决定</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card h-100">
+                                <div class="card-header">
+                                    <i class="bi bi-people"></i>
+                                    <strong>团队协作</strong>
+                                </div>
+                                <div class="card-body">
+                                    <ul>
+                                        <li>指定专人负责评论确认</li>
+                                        <li>建立评论确认的标准流程</li>
+                                        <li>定期回顾和优化审查质量</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 常见问题 -->
+                <section id="troubleshooting" class="guide-section">
+                    <h2 class="mb-4">
+                        <i class="bi bi-question-circle"></i>
+                        常见问题与解决方案
+                    </h2>
+
+                    <div class="accordion" id="faqAccordion">
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#faq1">
+                                    Q1: GitLab 连接失败怎么办？
+                                </button>
+                            </h2>
+                            <div id="faq1" class="accordion-collapse collapse show" data-bs-parent="#faqAccordion">
+                                <div class="accordion-body">
+                                    <h6>检查清单</h6>
+                                    <ul class="checklist">
+                                        <li>GitLab URL 是否正确（包含协议 http://）</li>
+                                        <li>访问令牌是否有效且未过期</li>
+                                        <li>令牌权限是否包含 api、read_repository、write_repository</li>
+                                        <li>网络是否可达（防火墙、代理设置）</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq2">
+                                    Q2: AI 分析不工作怎么办？
+                                </button>
+                            </h2>
+                            <div id="faq2" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                                <div class="accordion-body">
+                                    <h6>检查清单</h6>
+                                    <ul class="checklist">
+                                        <li>OpenWebUI 是否正常运行</li>
+                                        <li>AI API URL 是否正确</li>
+                                        <li>API 密钥是否有效</li>
+                                        <li>模型名称是否在 OpenWebUI 中存在</li>
+                                        <li>网络连接是否正常</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq3">
+                                    Q3: 如何更换 AI 模型？
+                                </button>
+                            </h2>
+                            <div id="faq3" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                                <div class="accordion-body">
+                                    <ol>
+                                        <li>在 OpenWebUI 中添加新的模型</li>
+                                        <li>在 AutoCodeReview 配置中更新模型名称</li>
+                                        <li>重新测试功能</li>
+                                    </ol>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq4">
+                                    Q4: 支持哪些 AI 模型？
+                                </button>
+                            </h2>
+                            <div id="faq4" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                                <div class="accordion-body">
+                                    <p>通过 OpenWebUI，支持兼容 OpenAI API 的模型，推荐：</p>
+                                    <ul>
+                                        <li><strong>qwen3-coder-480b-a35b</strong> - 代码分析专用模型</li>
+                                        <li>其他兼容 OpenAI API 格式的大语言模型</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq5">
+                                    Q5: 如何提高代码审查准确性？
+                                </button>
+                            </h2>
+                            <div id="faq5" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                                <div class="accordion-body">
+                                    <h6>建议</h6>
+                                    <ul>
+                                        <li>使用更强大的模型</li>
+                                        <li>确保代码库有良好的文档和注释</li>
+                                        <li>定期更新 AI 模型</li>
+                                        <li>针对特定语言或框架调整提示词</li>
+                                        <li>控制文件大小在合理范围内</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-warning mt-4">
+                        <h6><i class="bi bi-shield-check"></i> 安全注意事项</h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>访问令牌安全</h6>
+                                <ul>
+                                    <li>定期轮换 GitLab 访问令牌</li>
+                                    <li>使用最小权限原则</li>
+                                    <li>不要在代码或日志中暴露令牌</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>API 密钥安全</h6>
+                                <ul>
+                                    <li>妥善保管 OpenWebUI API 密钥</li>
+                                    <li>定期检查 API 使用情况</li>
+                                    <li>发现异常立即更换密钥</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="text-center mt-4">
+                        <p class="text-muted">
+                            如果遇到配置问题，请检查系统日志获取详细错误信息，
+                            参考本文档的常见问题部分，或联系系统管理员。
+                        </p>
+                        <hr>
+                        <small class="text-muted">
+                            <strong>更新时间：</strong>2025年9月 &nbsp;|&nbsp;
+                            <strong>版本：</strong>v1.0
+                        </small>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 返回顶部按钮 -->
+<button class="back-to-top" onclick="scrollToTop()">
+    <i class="bi bi-arrow-up"></i>
+</button>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 导航链接点击事件
+    const navLinks = document.querySelectorAll('.guide-nav .nav-link');
+    const sections = document.querySelectorAll('.guide-section');
+
+    // 点击导航链接时的处理
+    navLinks.forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+
+            // 更新导航状态
+            navLinks.forEach(l => l.classList.remove('active'));
+            this.classList.add('active');
+
+            // 滚动到对应部分
+            const targetId = this.getAttribute('href').substring(1);
+            const targetSection = document.getElementById(targetId);
+            if (targetSection) {
+                targetSection.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+            }
+        });
+    });
+
+    // 滚动时更新导航状态
+    window.addEventListener('scroll', function() {
+        let current = '';
+        sections.forEach(section => {
+            const sectionTop = section.offsetTop;
+            const sectionHeight = section.clientHeight;
+            if (window.pageYOffset >= sectionTop - 100) {
+                current = section.getAttribute('id');
+            }
+        });
+
+        navLinks.forEach(link => {
+            link.classList.remove('active');
+            if (link.getAttribute('href').substring(1) === current) {
+                link.classList.add('active');
+            }
+        });
+
+        // 显示/隐藏返回顶部按钮
+        const backToTopButton = document.querySelector('.back-to-top');
+        if (window.pageYOffset > 300) {
+            backToTopButton.style.display = 'flex';
+        } else {
+            backToTopButton.style.display = 'none';
+        }
+    });
+});
+
+function scrollToTop() {
+    window.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+    });
+}
+</script>
+{% endblock %}
