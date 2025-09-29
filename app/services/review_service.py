@@ -391,7 +391,8 @@ class ReviewService:
                             diff_content=change.get('diff', ''),
                             language=language,
                             mr_title=mr_info.get('title', ''),
-                            mr_description=mr_info.get('description', '')
+                            mr_description=mr_info.get('description', ''),
+                            review_config=user.review_config
                         )
 
                         # 调用AI分析
@@ -400,7 +401,18 @@ class ReviewService:
                             self.logger.info(f"AI analysis found {len(ai_issues)} issues in {file_path}")
 
                     except Exception as e:
-                        self.logger.warning(f"AI analysis failed for {file_path}: {e}")
+                        self.logger.error(f"AI analysis failed for {file_path}: {e}")
+                        # AI分析失败时，终止整个审查流程
+                        error_msg = f'AI代码分析失败: {str(e)}'
+                        if review_id:
+                            self.db.fail_review_record(review_id, error_msg)
+                        return {
+                            'success': False,
+                            'error': error_msg,
+                            'error_code': 'AI_ANALYSIS_FAILED',
+                            'review_id': review_id,
+                            'failed_file': file_path
+                        }
 
                     # 添加到分析文件列表（无论是否有问题都算分析过）
                     analyzed_files.append({

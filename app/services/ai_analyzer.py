@@ -25,6 +25,7 @@ class AIAnalysisContext:
     language: str
     mr_title: str = ""
     mr_description: str = ""
+    review_config: Dict = None  # 用户的详细检查配置
 
 
 class AICodeAnalyzer:
@@ -95,7 +96,7 @@ class AICodeAnalyzer:
 
         except requests.exceptions.Timeout as e:
             self.logger.error(f"AI API timeout: {e}")
-            raise Exception(f"AI服务超时：请求超过30秒未响应，请稍后重试")
+            raise Exception(f"AI服务超时：请求超过120秒未响应，请稍后重试")
         except requests.exceptions.ConnectionError as e:
             self.logger.error(f"AI API connection error: {e}")
             raise Exception(f"AI服务连接失败：无法连接到AI API服务器，请检查网络连接和API URL配置")
@@ -117,6 +118,171 @@ class AICodeAnalyzer:
         except Exception as e:
             self.logger.error(f"AI analysis failed: {e}")
             raise Exception(f"AI代码分析失败：{str(e)}")
+
+    def _get_analysis_dimensions(self, context: AIAnalysisContext) -> str:
+        """根据用户配置生成分析维度"""
+        if not context.review_config:
+            # 如果没有配置，使用默认的分析维度
+            return self._get_default_analysis_dimensions()
+
+        import json
+        try:
+            config = json.loads(context.review_config) if isinstance(context.review_config, str) else context.review_config
+        except:
+            config = {}
+
+        dimensions = []
+        dimension_count = 0
+
+        # 核心质量检查
+        if config.get('check_syntax', True):
+            dimension_count += 1
+            dimensions.append(f"{dimension_count}. **语法错误 (Syntax Errors)**:")
+            dimensions.append("   - 语法错误和语法警告")
+            dimensions.append("   - 代码结构问题")
+            dimensions.append("   - 缺少必要的语句或符号")
+            dimensions.append("")
+
+        if config.get('check_logic', True):
+            dimension_count += 1
+            dimensions.append(f"{dimension_count}. **逻辑错误 (Logic Errors)**:")
+            dimensions.append("   - 潜在的运行时错误")
+            dimensions.append("   - 边界条件处理")
+            dimensions.append("   - 逻辑漏洞和条件错误")
+            dimensions.append("")
+
+        if config.get('check_security', True):
+            dimension_count += 1
+            dimensions.append(f"{dimension_count}. **安全性 (Security)**:")
+            dimensions.append("   - SQL注入、XSS、CSRF等安全漏洞")
+            dimensions.append("   - 敏感信息泄露")
+            dimensions.append("   - 输入验证缺失")
+            dimensions.append("   - 权限控制问题")
+            dimensions.append("")
+
+        if config.get('check_performance', True):
+            dimension_count += 1
+            dimensions.append(f"{dimension_count}. **性能优化 (Performance)**:")
+            dimensions.append("   - 算法复杂度问题")
+            dimensions.append("   - 内存泄露风险")
+            dimensions.append("   - 不必要的循环或计算")
+            dimensions.append("   - 数据库查询优化")
+            dimensions.append("")
+
+        if config.get('check_style', True):
+            dimension_count += 1
+            dimensions.append(f"{dimension_count}. **代码风格 (Code Style)**:")
+            dimensions.append("   - 代码格式和缩进")
+            dimensions.append("   - 命名规范")
+            dimensions.append("   - 代码可读性")
+            dimensions.append("   - 注释规范")
+            dimensions.append("")
+
+        if config.get('check_best_practices', True):
+            dimension_count += 1
+            dimensions.append(f"{dimension_count}. **最佳实践 (Best Practices)**:")
+            dimensions.append("   - 设计模式使用")
+            dimensions.append("   - 框架特定的最佳实践")
+            dimensions.append("   - 代码重构建议")
+            dimensions.append("   - 异常处理")
+            dimensions.append("")
+
+        # 可选检查项
+        if config.get('check_comments', False):
+            dimension_count += 1
+            dimensions.append(f"{dimension_count}. **注释完整性 (Comments)**:")
+            dimensions.append("   - 缺少必要的注释")
+            dimensions.append("   - 注释与代码不匹配")
+            dimensions.append("   - 复杂逻辑缺少解释")
+            dimensions.append("")
+
+        if config.get('check_documentation', False):
+            dimension_count += 1
+            dimensions.append(f"{dimension_count}. **文档建议 (Documentation)**:")
+            dimensions.append("   - API文档缺失")
+            dimensions.append("   - 函数/方法文档")
+            dimensions.append("   - 使用示例和说明")
+            dimensions.append("")
+
+        if config.get('check_readability', False):
+            dimension_count += 1
+            dimensions.append(f"{dimension_count}. **可读性检查 (Readability)**:")
+            dimensions.append("   - 代码复杂度过高")
+            dimensions.append("   - 函数/方法过长")
+            dimensions.append("   - 嵌套层次过深")
+            dimensions.append("")
+
+        if config.get('check_naming', False):
+            dimension_count += 1
+            dimensions.append(f"{dimension_count}. **命名规范 (Naming Convention)**:")
+            dimensions.append("   - 变量命名不清晰")
+            dimensions.append("   - 函数命名不符合规范")
+            dimensions.append("   - 类和模块命名问题")
+            dimensions.append("")
+
+        # 如果用户没有选择任何选项，使用默认维度
+        if not dimensions:
+            return self._get_default_analysis_dimensions()
+
+        # 添加忽略的维度说明
+        ignored_checks = []
+        if not config.get('check_syntax', True):
+            ignored_checks.append("语法错误")
+        if not config.get('check_logic', True):
+            ignored_checks.append("逻辑错误")
+        if not config.get('check_security', True):
+            ignored_checks.append("安全性")
+        if not config.get('check_performance', True):
+            ignored_checks.append("性能优化")
+        if not config.get('check_style', True):
+            ignored_checks.append("代码风格")
+        if not config.get('check_best_practices', True):
+            ignored_checks.append("最佳实践")
+        if not config.get('check_comments', False):
+            ignored_checks.append("注释完整性")
+        if not config.get('check_documentation', False):
+            ignored_checks.append("文档建议")
+        if not config.get('check_readability', False):
+            ignored_checks.append("可读性")
+        if not config.get('check_naming', False):
+            ignored_checks.append("命名规范")
+
+        result = "\n".join(dimensions)
+
+        if ignored_checks:
+            result += f"\n**注意**: 用户已关闭以下检查项，请不要分析这些方面: {', '.join(ignored_checks)}\n"
+
+        return result
+
+    def _get_default_analysis_dimensions(self) -> str:
+        """获取默认的分析维度"""
+        return """1. **安全性 (Security)**:
+   - SQL注入、XSS、CSRF等安全漏洞
+   - 敏感信息泄露
+   - 输入验证缺失
+   - 权限控制问题
+
+2. **性能 (Performance)**:
+   - 算法复杂度问题
+   - 内存泄露风险
+   - 不必要的循环或计算
+   - 数据库查询优化
+
+3. **代码质量 (Quality)**:
+   - 代码可读性
+   - 命名规范
+   - 函数/方法设计
+   - 异常处理
+
+4. **最佳实践 (Best Practices)**:
+   - 设计模式使用
+   - 框架特定的最佳实践
+   - 代码重构建议
+
+5. **逻辑错误 (Logic)**:
+   - 潜在的运行时错误
+   - 边界条件处理
+   - 逻辑漏洞"""
 
     def _build_analysis_prompt(self, context: AIAnalysisContext) -> str:
         """构建AI分析提示词"""
@@ -153,33 +319,7 @@ class AICodeAnalyzer:
 
 请从以下维度分析新增/修改后的代码：
 
-1. **安全性 (Security)**:
-   - SQL注入、XSS、CSRF等安全漏洞
-   - 敏感信息泄露
-   - 输入验证缺失
-   - 权限控制问题
-
-2. **性能 (Performance)**:
-   - 算法复杂度问题
-   - 内存泄露风险
-   - 不必要的循环或计算
-   - 数据库查询优化
-
-3. **代码质量 (Quality)**:
-   - 代码可读性
-   - 命名规范
-   - 函数/方法设计
-   - 异常处理
-
-4. **最佳实践 (Best Practices)**:
-   - 设计模式使用
-   - 框架特定的最佳实践
-   - 代码重构建议
-
-5. **逻辑错误 (Logic)**:
-   - 潜在的运行时错误
-   - 边界条件处理
-   - 逻辑漏洞
+{self._get_analysis_dimensions(context)}
 
 **分析要求**:
 - 只分析新增/修改的代码行及其直接相关的上下文
@@ -258,7 +398,7 @@ class AICodeAnalyzer:
             ]
         }
 
-        response = requests.post(url, json=data, headers=headers, timeout=30)
+        response = requests.post(url, json=data, headers=headers, timeout=120)
         response.raise_for_status()
 
         return response.json()

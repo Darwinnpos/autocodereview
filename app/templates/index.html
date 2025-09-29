@@ -256,6 +256,10 @@ document.getElementById('reviewForm').addEventListener('submit', async function(
             errorIcon = 'bi-shield-exclamation';
             errorTitle = 'GitLab权限问题';
             errorSuggestion = '<small class="text-muted">请确保您有权限访问该项目和Merge Request</small>';
+        } else if (errorMessage.includes('AI服务超时') || errorMessage.includes('请求超过120秒未响应')) {
+            errorIcon = 'bi-clock';
+            errorTitle = 'AI服务超时';
+            errorSuggestion = '<small class="text-muted">代码分析耗时过长，请尝试减少文件数量或稍后重试</small>';
         } else if (errorMessage.includes('AI服务') || errorMessage.includes('AI API')) {
             errorIcon = 'bi-robot';
             errorTitle = 'AI服务问题';
