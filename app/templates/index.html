@@ -1254,5 +1254,29 @@ document.getElementById('cancelReviewBtn').addEventListener('click', async funct
         cancelBtn.innerHTML = originalText;
     }
 });
+
+// 页面加载时检查URL参数
+document.addEventListener('DOMContentLoaded', function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const mrUrl = urlParams.get('mr_url');
+
+    if (mrUrl) {
+        // 自动填入MR URL
+        document.getElementById('mrUrl').value = decodeURIComponent(mrUrl);
+
+        // 滚动到表单位置
+        document.getElementById('reviewForm').scrollIntoView({
+            behavior: 'smooth',
+            block: 'center'
+        });
+
+        // 可选：自动聚焦到输入框
+        document.getElementById('mrUrl').focus();
+
+        // 清除URL参数（保持页面整洁）
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, '', newUrl);
+    }
+});
 </script>
 {% endblock %}

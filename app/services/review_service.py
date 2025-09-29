@@ -254,38 +254,71 @@ class ReviewService:
             analyzed_files = []
             issue_records = []
 
-             # 初始化AI分析器
-             if not user.ai_api_key:
-                 error_msg = 'AI API密钥未配置，无法进行代码分析'
-                 if review_id:
-                     self.db.fail_review_record(review_id, error_msg)
-                 return {
-                     'success': False,
-                     'error': error_msg,
-                     'error_code': 'AI_CONFIG_ERROR',
-                     'review_id': review_id
-                 }
+            # 初始化AI分析器
+            if not user.ai_api_key:
+                error_msg = 'AI API密钥未配置，无法进行代码分析'
+                if review_id:
+                    self.db.fail_review_record(review_id, error_msg)
+                return {
+                    'success': False,
+                    'error': error_msg,
+                    'error_code': 'AI_CONFIG_ERROR',
+                    'review_id': review_id
+                }
 
-             ai_config = {
-                 'ai_api_url': user.ai_api_url,
-                 'ai_api_key': user.ai_api_key,
-                 'ai_model': user.ai_model,
-                 'review_severity_level': getattr(user, 'review_severity_level', 'standard')
-             }
-             ai_analyzer = AICodeAnalyzer(ai_config)
+            if not user.ai_api_url:
+                error_msg = 'AI API URL未配置，无法进行代码分析'
+                if review_id:
+                    self.db.fail_review_record(review_id, error_msg)
+                return {
+                    'success': False,
+                    'error': error_msg,
+                    'error_code': 'AI_CONFIG_ERROR',
+                    'review_id': review_id
+                }
+
+            if not user.ai_model:
+                error_msg = 'AI模型未配置，无法进行代码分析'
+                if review_id:
+                    self.db.fail_review_record(review_id, error_msg)
+                return {
+                    'success': False,
+                    'error': error_msg,
+                    'error_code': 'AI_CONFIG_ERROR',
+                    'review_id': review_id
+                }
+
+            ai_config = {
+                'ai_api_url': user.ai_api_url,
+                'ai_api_key': user.ai_api_key,
+                'ai_model': user.ai_model,
+                'review_severity_level': getattr(user, 'review_severity_level', 'standard')
+            }
+            ai_analyzer = AICodeAnalyzer(ai_config)
              
-             # 验证AI模型是否可用
-             if not ai_analyzer.validate_model_availability():
-                 error_msg = f'AI模型 "{user.ai_model}" 不可用，请检查AI配置'
-                 if review_id:
-                     self.db.fail_review_record(review_id, error_msg)
-                 return {
-                     'success': False,
-                     'error': error_msg,
-                     'error_code': 'AI_MODEL_UNAVAILABLE',
-                     'review_id': review_id
-                 }
-             self.logger.info("AI analyzer initialized")
+            # 验证AI模型是否可用
+            try:
+                if not ai_analyzer.validate_model_availability():
+                    error_msg = f'AI模型 "{user.ai_model}" 不可用，请检查AI配置'
+                    if review_id:
+                        self.db.fail_review_record(review_id, error_msg)
+                    return {
+                        'success': False,
+                        'error': error_msg,
+                        'error_code': 'AI_MODEL_UNAVAILABLE',
+                        'review_id': review_id
+                    }
+            except Exception as e:
+                error_msg = f'AI模型验证失败: {str(e)}'
+                if review_id:
+                    self.db.fail_review_record(review_id, error_msg)
+                return {
+                    'success': False,
+                    'error': error_msg,
+                    'error_code': 'AI_MODEL_VALIDATION_ERROR',
+                    'review_id': review_id
+                }
+            self.logger.info("AI analyzer initialized")
 
             # 初始化进度跟踪
             # 计算需要分析的文件数（排除删除的文件）
@@ -803,6 +836,10 @@ class ReviewService:
 
                 if success:
                     self.db.update_comment_gitlab_id(issue_id, "posted")
+                    # 更新审查记录中的comments_posted计数
+                    issue = self._get_issue_by_id(issue_id)
+                    if issue:
+                        self.db.update_comments_posted_count(issue['review_id'], 1)
                     return True
                 else:
                     self.logger.error(f"Failed to post comment to GitLab for issue {issue_id}")
@@ -854,6 +891,10 @@ class ReviewService:
                     if success:
                         self.db.update_comment_gitlab_id(issue_id, "posted")
                         posted_count += 1
+
+            # 更新审查记录中的comments_posted计数
+            if posted_count > 0:
+                self.db.update_comments_posted_count(review_id, posted_count)
 
             return {
                 'success': True,
@@ -1032,7 +1073,8 @@ class ReviewService:
                     'total_files': 0,
                     'processed_files': 0,
                     'total_issues': 0,
-                    'current_file': None
+                    'current_file': None,
+                    'error_message': review.get('error_message')  # 添加具体的错误信息
                 }
             elif review['status'] == 'pending':
                 # 对于pending状态，返回正在准备的状态

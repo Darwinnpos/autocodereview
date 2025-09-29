@@ -112,6 +112,9 @@
                     <li class="nav-item" id="navConfigItem" style="display: none;">
                         <a class="nav-link" href="/profile">配置管理</a>
                     </li>
+                    <li class="nav-item" id="navHistoryItem" style="display: none;">
+                        <a class="nav-link" href="/history">审核历史</a>
+                    </li>
                     <li class="nav-item" id="navAdminItem" style="display: none;">
                         <a class="nav-link" href="/admin">管理员控制台</a>
                     </li>
@@ -205,8 +208,9 @@
         document.getElementById('navUserDropdown').style.display = 'block';
         document.getElementById('navUsername').textContent = currentUser.username;
 
-        // 显示配置管理（所有登录用户都可见）
+        // 显示配置管理和审核历史（所有登录用户都可见）
         document.getElementById('navConfigItem').style.display = 'block';
+        document.getElementById('navHistoryItem').style.display = 'block';
 
         // 如果是管理员，显示管理员控制台
         if (currentUser.role === 'admin') {
@@ -222,6 +226,7 @@
         // 隐藏用户相关菜单
         document.getElementById('navUserDropdown').style.display = 'none';
         document.getElementById('navConfigItem').style.display = 'none';
+        document.getElementById('navHistoryItem').style.display = 'none';
         document.getElementById('navAdminItem').style.display = 'none';
     }
 
@@ -232,7 +237,7 @@
             showLoggedOutNav();
 
             // 如果在需要登录的页面，跳转到首页
-            const protectedPages = ['/config', '/admin', '/profile'];
+            const protectedPages = ['/config', '/admin', '/profile', '/history'];
             if (protectedPages.some(page => window.location.pathname.startsWith(page))) {
                 window.location.href = '/';
             }

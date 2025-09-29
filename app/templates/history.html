@@ -1,0 +1,812 @@
+{% extends "base.html" %}
+
+{% block title %}AutoCodeReview - 审核历史{% endblock %}
+
+{% block content %}
+<!-- 统计概览卡片区 -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">总审查次数</h6>
+                        <h3 id="totalReviews">--</h3>
+                    </div>
+                    <i class="bi bi-file-earmark-code display-6"></i>
+                </div>
+                <small id="totalReviewsPeriod">最近30天</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">成功率</h6>
+                        <h3 id="successRate">--%</h3>
+                    </div>
+                    <i class="bi bi-check-circle display-6"></i>
+                </div>
+                <small>完成/总数</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">发现问题</h6>
+                        <h3 id="totalIssues">--</h3>
+                    </div>
+                    <i class="bi bi-bug display-6"></i>
+                </div>
+                <small>累计问题数</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">评论发布</h6>
+                        <h3 id="commentsPosted">--</h3>
+                    </div>
+                    <i class="bi bi-chat-dots display-6"></i>
+                </div>
+                <small>已发布评论</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- 主要内容区 -->
+    <div class="col-lg-8">
+        <!-- 审查记录列表 -->
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="bi bi-list-ul"></i>
+                    审查历史
+                    <span class="badge bg-secondary ms-2" id="totalRecordsCount">0</span>
+                </h5>
+                <div>
+                    <button class="btn btn-outline-secondary btn-sm" id="exportBtn" disabled>
+                        <i class="bi bi-download"></i> 导出
+                    </button>
+                    <button class="btn btn-outline-success btn-sm" id="refreshBtn">
+                        <i class="bi bi-arrow-clockwise"></i> 刷新
+                    </button>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <!-- 加载状态 -->
+                <div id="loadingIndicator" class="text-center p-4">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">加载中...</span>
+                    </div>
+                    <div class="mt-2">正在加载审查记录...</div>
+                </div>
+
+                <!-- 空状态 -->
+                <div id="emptyState" class="text-center p-5" style="display: none;">
+                    <i class="bi bi-inbox display-1 text-muted"></i>
+                    <h5 class="mt-3 text-muted">暂无审查记录</h5>
+                    <p class="text-muted">开始您的第一次代码审查吧！</p>
+                    <a href="/" class="btn btn-primary">
+                        <i class="bi bi-play"></i> 开始审查
+                    </a>
+                </div>
+
+                <!-- 记录表格 -->
+                <div id="reviewsTable" style="display: none;">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th width="5%" class="text-center">#</th>
+                                    <th width="20%">项目信息</th>
+                                    <th width="25%">MR信息</th>
+                                    <th width="15%">分析结果</th>
+                                    <th width="12%">状态</th>
+                                    <th width="13%">时间</th>
+                                    <th width="10%" class="text-center">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="reviewsTableBody">
+                                <!-- 动态生成的审查记录行 -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- 分页导航 -->
+                    <div class="card-footer">
+                        <nav aria-label="审查记录分页">
+                            <ul class="pagination pagination-sm justify-content-center mb-0" id="pagination">
+                                <!-- 分页按钮动态生成 -->
+                            </ul>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 右侧筛选面板 -->
+    <div class="col-lg-4">
+        <!-- 筛选与搜索 -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="bi bi-funnel"></i> 筛选与搜索
+                </h6>
+            </div>
+            <div class="card-body">
+                <!-- 时间范围选择 -->
+                <div class="mb-3">
+                    <label class="form-label">时间范围</label>
+                    <select class="form-select" id="dateRange">
+                        <option value="7">最近7天</option>
+                        <option value="30" selected>最近30天</option>
+                        <option value="90">最近90天</option>
+                        <option value="all">全部时间</option>
+                        <option value="custom">自定义</option>
+                    </select>
+                </div>
+
+                <!-- 自定义日期范围 -->
+                <div id="customDateRange" style="display: none;">
+                    <div class="row mb-3">
+                        <div class="col-6">
+                            <label class="form-label small">开始日期</label>
+                            <input type="date" class="form-control form-control-sm" id="startDate">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small">结束日期</label>
+                            <input type="date" class="form-control form-control-sm" id="endDate">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 状态筛选 -->
+                <div class="mb-3">
+                    <label class="form-label">审查状态</label>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="statusCompleted" checked>
+                        <label class="form-check-label small">
+                            <span class="badge bg-success">已完成</span>
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="statusFailed" checked>
+                        <label class="form-check-label small">
+                            <span class="badge bg-danger">失败</span>
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="statusPending">
+                        <label class="form-check-label small">
+                            <span class="badge bg-primary">进行中</span>
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="statusCancelled">
+                        <label class="form-check-label small">
+                            <span class="badge bg-secondary">已取消</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- 搜索框 -->
+                <div class="mb-3">
+                    <label class="form-label">搜索</label>
+                    <input type="text" class="form-control" id="searchQuery"
+                           placeholder="项目名称、MR标题、分支名...">
+                    <div class="form-text small">支持模糊搜索</div>
+                </div>
+
+                <div class="d-grid gap-2">
+                    <button class="btn btn-primary btn-sm" id="applyFiltersBtn">
+                        <i class="bi bi-search"></i> 应用筛选
+                    </button>
+                    <button class="btn btn-outline-secondary btn-sm" id="resetFiltersBtn">
+                        <i class="bi bi-arrow-counterclockwise"></i> 重置筛选
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 趋势分析 -->
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="bi bi-bar-chart"></i> 趋势分析
+                </h6>
+            </div>
+            <div class="card-body">
+                <canvas id="reviewTrendChart" height="200"></canvas>
+                <div id="chartLoadingIndicator" class="text-center p-3">
+                    <div class="spinner-border spinner-border-sm" role="status"></div>
+                    <div class="mt-2 small text-muted">加载趋势数据...</div>
+                </div>
+                <div id="chartEmptyState" class="text-center p-3" style="display: none;">
+                    <i class="bi bi-graph-up text-muted"></i>
+                    <div class="mt-2 small text-muted">暂无趋势数据</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 详情模态框 -->
+<div class="modal fade" id="reviewDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-file-text"></i>
+                    审查详情
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="reviewDetailContent">
+                <!-- 详情内容动态加载 -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// 审查历史管理器
+class ReviewHistoryManager {
+    constructor() {
+        this.currentPage = 1;
+        this.pageSize = 10;
+        this.totalPages = 0;
+        this.totalRecords = 0;
+        this.currentFilters = {
+            dateRange: '30',
+            status: ['completed', 'failed'],
+            search: ''
+        };
+        this.trendChart = null;
+    }
+
+    async init() {
+        this.initEventListeners();
+        await this.loadAll();
+    }
+
+    initEventListeners() {
+        // 筛选控件事件
+        document.getElementById('dateRange').addEventListener('change', (e) => {
+            const customRange = document.getElementById('customDateRange');
+            if (e.target.value === 'custom') {
+                customRange.style.display = 'block';
+            } else {
+                customRange.style.display = 'none';
+            }
+        });
+
+        document.getElementById('applyFiltersBtn').addEventListener('click', () => {
+            this.applyFilters();
+        });
+
+        document.getElementById('resetFiltersBtn').addEventListener('click', () => {
+            this.resetFilters();
+        });
+
+        document.getElementById('refreshBtn').addEventListener('click', () => {
+            this.loadAll();
+        });
+
+        // 搜索框回车事件
+        document.getElementById('searchQuery').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                this.applyFilters();
+            }
+        });
+    }
+
+    async loadAll() {
+        await Promise.all([
+            this.loadStatistics(),
+            this.loadReviews(),
+            this.loadTrendData()
+        ]);
+    }
+
+    async loadStatistics() {
+        try {
+            const params = this.buildFilterParams();
+            const response = await axios.get('/api/history/statistics', { params });
+
+            if (response.data.success) {
+                this.updateStatisticsCards(response.data.data);
+            } else {
+                console.error('Statistics API returned error:', response.data.error);
+            }
+        } catch (error) {
+            console.error('Failed to load statistics:', error);
+        }
+    }
+
+    async loadReviews() {
+        try {
+            this.showLoadingState();
+
+            const params = {
+                ...this.buildFilterParams(),
+                page: this.currentPage,
+                limit: this.pageSize
+            };
+
+            const response = await axios.get('/api/history/reviews', { params });
+
+            if (response.data.success) {
+                const data = response.data.data;
+                this.totalRecords = data.total;
+                this.totalPages = Math.ceil(data.total / this.pageSize);
+
+                if (data.reviews.length === 0 && this.currentPage === 1) {
+                    this.showEmptyState();
+                } else {
+                    this.renderReviewsTable(data.reviews);
+                    this.updatePagination();
+                    this.showTableState();
+                }
+
+                document.getElementById('totalRecordsCount').textContent = data.total;
+            } else {
+                console.error('API returned error:', response.data.error);
+                this.showErrorState();
+            }
+        } catch (error) {
+            console.error('Failed to load reviews:', error);
+            this.showErrorState();
+        }
+    }
+
+    async loadTrendData() {
+        try {
+            const chartContainer = document.getElementById('reviewTrendChart');
+            const loadingIndicator = document.getElementById('chartLoadingIndicator');
+            const emptyState = document.getElementById('chartEmptyState');
+
+            loadingIndicator.style.display = 'block';
+            emptyState.style.display = 'none';
+            chartContainer.style.display = 'none';
+
+            const params = this.buildFilterParams();
+            const response = await axios.get('/api/history/trend', { params });
+
+            if (response.data.success && response.data.data.length > 0) {
+                this.renderTrendChart(response.data.data);
+                loadingIndicator.style.display = 'none';
+                chartContainer.style.display = 'block';
+            } else {
+                loadingIndicator.style.display = 'none';
+                emptyState.style.display = 'block';
+            }
+        } catch (error) {
+            console.error('Failed to load trend data:', error);
+            document.getElementById('chartLoadingIndicator').style.display = 'none';
+            document.getElementById('chartEmptyState').style.display = 'block';
+        }
+    }
+
+    buildFilterParams() {
+        const params = {};
+
+        // 时间范围
+        const dateRange = document.getElementById('dateRange').value;
+        if (dateRange === 'custom') {
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            if (startDate && endDate) {
+                params.start_date = startDate;
+                params.end_date = endDate;
+            }
+        } else if (dateRange !== 'all') {
+            params.days = parseInt(dateRange);
+        }
+
+        // 状态筛选
+        const statuses = [];
+        if (document.getElementById('statusCompleted').checked) statuses.push('completed');
+        if (document.getElementById('statusFailed').checked) statuses.push('failed');
+        if (document.getElementById('statusPending').checked) statuses.push('pending');
+        if (document.getElementById('statusCancelled').checked) statuses.push('cancelled');
+
+        if (statuses.length > 0) {
+            params.status = statuses.join(',');
+        }
+
+        // 搜索关键词
+        const search = document.getElementById('searchQuery').value.trim();
+        if (search) {
+            params.search = search;
+        }
+
+        return params;
+    }
+
+    applyFilters() {
+        this.currentPage = 1;
+        this.loadAll();
+    }
+
+    resetFilters() {
+        document.getElementById('dateRange').value = '30';
+        document.getElementById('customDateRange').style.display = 'none';
+        document.getElementById('startDate').value = '';
+        document.getElementById('endDate').value = '';
+        document.getElementById('statusCompleted').checked = true;
+        document.getElementById('statusFailed').checked = true;
+        document.getElementById('statusPending').checked = false;
+        document.getElementById('statusCancelled').checked = false;
+        document.getElementById('searchQuery').value = '';
+
+        this.currentPage = 1;
+        this.loadAll();
+    }
+
+    updateStatisticsCards(stats) {
+        document.getElementById('totalReviews').textContent = stats.total_reviews || 0;
+        document.getElementById('successRate').textContent = (stats.success_rate || 0) + '%';
+        document.getElementById('totalIssues').textContent = stats.total_issues || 0;
+        document.getElementById('commentsPosted').textContent = stats.comments_posted || 0;
+
+        const dateRange = document.getElementById('dateRange').value;
+        let periodText = '最近30天';
+        if (dateRange === '7') periodText = '最近7天';
+        else if (dateRange === '90') periodText = '最近90天';
+        else if (dateRange === 'all') periodText = '全部时间';
+        else if (dateRange === 'custom') periodText = '自定义时间';
+
+        document.getElementById('totalReviewsPeriod').textContent = periodText;
+    }
+
+    renderReviewsTable(reviews) {
+        const tbody = document.getElementById('reviewsTableBody');
+        tbody.innerHTML = '';
+
+        reviews.forEach((review, index) => {
+            const row = this.createReviewRow(review, (this.currentPage - 1) * this.pageSize + index + 1);
+            tbody.appendChild(row);
+        });
+    }
+
+    createReviewRow(review, rowNumber) {
+        const tr = document.createElement('tr');
+        tr.className = 'review-row';
+        tr.style.cursor = 'pointer';
+
+        // 状态样式映射
+        const statusMap = {
+            'completed': { class: 'success', text: '已完成', icon: 'check-circle' },
+            'failed': { class: 'danger', text: '失败', icon: 'x-circle' },
+            'pending': { class: 'primary', text: '进行中', icon: 'clock' },
+            'cancelled': { class: 'secondary', text: '已取消', icon: 'dash-circle' }
+        };
+
+        const status = statusMap[review.status] || statusMap['failed'];
+
+        // 格式化时间
+        const createdAt = new Date(review.created_at).toLocaleString('zh-CN');
+        const completedAt = review.completed_at ?
+            new Date(review.completed_at).toLocaleString('zh-CN') : '-';
+
+        // 项目信息
+        const projectInfo = review.project_path || '未知项目';
+        const projectShort = projectInfo.length > 20 ?
+            projectInfo.substring(0, 20) + '...' : projectInfo;
+
+        // MR信息
+        const mrTitle = review.mr_title || '未知标题';
+        const mrTitleShort = mrTitle.length > 30 ?
+            mrTitle.substring(0, 30) + '...' : mrTitle;
+
+        tr.innerHTML = `
+            <td class="text-center">${rowNumber}</td>
+            <td>
+                <div class="small">
+                    <strong title="${projectInfo}">${projectShort}</strong><br>
+                    <span class="text-muted">ID: ${review.project_id || 'N/A'}</span>
+                </div>
+            </td>
+            <td>
+                <div class="small">
+                    <strong title="${mrTitle}">${mrTitleShort}</strong><br>
+                    <span class="text-muted">!${review.mr_iid || 'N/A'} • ${review.mr_author || 'Unknown'}</span><br>
+                    <span class="text-muted">${review.source_branch || 'unknown'} → ${review.target_branch || 'unknown'}</span>
+                </div>
+            </td>
+            <td>
+                <div class="small">
+                    <div><span class="badge bg-light text-dark">文件: ${review.total_files_analyzed || 0}</span></div>
+                    <div class="mt-1"><span class="badge bg-light text-dark">问题: ${review.total_issues_found || 0}</span></div>
+                    ${review.total_issues_found > 0 ? `
+                        <div class="mt-1">
+                            <span class="badge bg-danger">${review.error_count || 0}</span>
+                            <span class="badge bg-warning">${review.warning_count || 0}</span>
+                            <span class="badge bg-info">${review.info_count || 0}</span>
+                        </div>
+                    ` : ''}
+                </div>
+            </td>
+            <td>
+                <span class="badge bg-${status.class}">
+                    <i class="bi bi-${status.icon}"></i> ${status.text}
+                </span>
+                ${review.status === 'failed' && review.error_message ? `
+                    <br><small class="text-danger" title="${review.error_message}">
+                        ${review.error_message.length > 20 ? review.error_message.substring(0, 20) + '...' : review.error_message}
+                    </small>
+                ` : ''}
+            </td>
+            <td class="small">
+                <div>创建: ${createdAt}</div>
+                ${review.completed_at ? `<div class="text-muted">完成: ${completedAt}</div>` : ''}
+            </td>
+            <td class="text-center">
+                <div class="btn-group" role="group">
+                    <button class="btn btn-outline-primary btn-sm" onclick="showReviewDetail(${review.id})" title="查看详情">
+                        <i class="bi bi-eye"></i>
+                    </button>
+                    ${review.mr_url ? `
+                        <button class="btn btn-outline-info btn-sm" onclick="openMR('${review.mr_url}')" title="查看MR">
+                            <i class="bi bi-arrow-up-right-square"></i>
+                        </button>
+                    ` : ''}
+                    ${review.status === 'completed' ? `
+                        <button class="btn btn-outline-success btn-sm" onclick="reviewAgain('${review.mr_url}')" title="重新审查">
+                            <i class="bi bi-arrow-clockwise"></i>
+                        </button>
+                    ` : ''}
+                </div>
+            </td>
+        `;
+
+        return tr;
+    }
+
+    updatePagination() {
+        const pagination = document.getElementById('pagination');
+        pagination.innerHTML = '';
+
+        if (this.totalPages <= 1) return;
+
+        // 上一页
+        const prevLi = document.createElement('li');
+        prevLi.className = `page-item ${this.currentPage === 1 ? 'disabled' : ''}`;
+        prevLi.innerHTML = `<a class="page-link" href="#" onclick="historyManager.goToPage(${this.currentPage - 1})">上一页</a>`;
+        pagination.appendChild(prevLi);
+
+        // 页码
+        const startPage = Math.max(1, this.currentPage - 2);
+        const endPage = Math.min(this.totalPages, startPage + 4);
+
+        for (let i = startPage; i <= endPage; i++) {
+            const li = document.createElement('li');
+            li.className = `page-item ${i === this.currentPage ? 'active' : ''}`;
+            li.innerHTML = `<a class="page-link" href="#" onclick="historyManager.goToPage(${i})">${i}</a>`;
+            pagination.appendChild(li);
+        }
+
+        // 下一页
+        const nextLi = document.createElement('li');
+        nextLi.className = `page-item ${this.currentPage === this.totalPages ? 'disabled' : ''}`;
+        nextLi.innerHTML = `<a class="page-link" href="#" onclick="historyManager.goToPage(${this.currentPage + 1})">下一页</a>`;
+        pagination.appendChild(nextLi);
+    }
+
+    goToPage(page) {
+        if (page < 1 || page > this.totalPages) return;
+        this.currentPage = page;
+        this.loadReviews();
+    }
+
+    renderTrendChart(data) {
+        const ctx = document.getElementById('reviewTrendChart').getContext('2d');
+
+        if (this.trendChart) {
+            this.trendChart.destroy();
+        }
+
+        const labels = data.map(item => {
+            const date = new Date(item.date);
+            return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
+        });
+
+        const totalData = data.map(item => item.total_count);
+        const completedData = data.map(item => item.completed_count);
+        const failedData = data.map(item => item.failed_count);
+
+        this.trendChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: '总审查数',
+                        data: totalData,
+                        borderColor: 'rgb(54, 162, 235)',
+                        backgroundColor: 'rgba(54, 162, 235, 0.1)',
+                        tension: 0.1
+                    },
+                    {
+                        label: '成功',
+                        data: completedData,
+                        borderColor: 'rgb(75, 192, 192)',
+                        backgroundColor: 'rgba(75, 192, 192, 0.1)',
+                        tension: 0.1
+                    },
+                    {
+                        label: '失败',
+                        data: failedData,
+                        borderColor: 'rgb(255, 99, 132)',
+                        backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                        tension: 0.1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 1
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+    }
+
+    showLoadingState() {
+        document.getElementById('loadingIndicator').style.display = 'block';
+        document.getElementById('emptyState').style.display = 'none';
+        document.getElementById('reviewsTable').style.display = 'none';
+    }
+
+    showEmptyState() {
+        document.getElementById('loadingIndicator').style.display = 'none';
+        document.getElementById('emptyState').style.display = 'block';
+        document.getElementById('reviewsTable').style.display = 'none';
+    }
+
+    showTableState() {
+        document.getElementById('loadingIndicator').style.display = 'none';
+        document.getElementById('emptyState').style.display = 'none';
+        document.getElementById('reviewsTable').style.display = 'block';
+    }
+
+    showErrorState() {
+        document.getElementById('loadingIndicator').style.display = 'none';
+        document.getElementById('emptyState').style.display = 'none';
+        document.getElementById('reviewsTable').style.display = 'none';
+        // TODO: 显示错误状态
+    }
+}
+
+// 全局实例
+let historyManager;
+
+// 页面加载完成后初始化
+document.addEventListener('DOMContentLoaded', function() {
+    historyManager = new ReviewHistoryManager();
+    historyManager.init();
+});
+
+// 全局功能函数
+async function showReviewDetail(reviewId) {
+    try {
+        const response = await axios.get(`/api/history/review/${reviewId}`);
+        if (response.data.success) {
+            const review = response.data.data;
+            renderReviewDetailModal(review);
+            const modal = new bootstrap.Modal(document.getElementById('reviewDetailModal'));
+            modal.show();
+        }
+    } catch (error) {
+        console.error('Failed to load review detail:', error);
+        alert('加载详情失败');
+    }
+}
+
+function renderReviewDetailModal(review) {
+    const content = document.getElementById('reviewDetailContent');
+    content.innerHTML = `
+        <div class="row">
+            <div class="col-md-6">
+                <h6>基本信息</h6>
+                <table class="table table-sm">
+                    <tr><td>项目路径</td><td>${review.project_path || 'N/A'}</td></tr>
+                    <tr><td>项目ID</td><td>${review.project_id || 'N/A'}</td></tr>
+                    <tr><td>MR ID</td><td>!${review.mr_iid || 'N/A'}</td></tr>
+                    <tr><td>MR标题</td><td>${review.mr_title || 'N/A'}</td></tr>
+                    <tr><td>MR作者</td><td>${review.mr_author || 'N/A'}</td></tr>
+                    <tr><td>源分支</td><td>${review.source_branch || 'N/A'}</td></tr>
+                    <tr><td>目标分支</td><td>${review.target_branch || 'N/A'}</td></tr>
+                </table>
+            </div>
+            <div class="col-md-6">
+                <h6>分析结果</h6>
+                <table class="table table-sm">
+                    <tr><td>分析文件数</td><td>${review.total_files_analyzed || 0}</td></tr>
+                    <tr><td>发现问题数</td><td>${review.total_issues_found || 0}</td></tr>
+                    <tr><td>错误</td><td><span class="badge bg-danger">${review.error_count || 0}</span></td></tr>
+                    <tr><td>警告</td><td><span class="badge bg-warning">${review.warning_count || 0}</span></td></tr>
+                    <tr><td>建议</td><td><span class="badge bg-info">${review.info_count || 0}</span></td></tr>
+                    <tr><td>已发布评论</td><td>${review.comments_posted || 0}</td></tr>
+                    <tr><td>评论发布失败</td><td>${review.comment_errors_count || 0}</td></tr>
+                </table>
+            </div>
+        </div>
+
+        <div class="row mt-3">
+            <div class="col-12">
+                <h6>时间信息</h6>
+                <table class="table table-sm">
+                    <tr><td>创建时间</td><td>${new Date(review.created_at).toLocaleString('zh-CN')}</td></tr>
+                    <tr><td>完成时间</td><td>${review.completed_at ? new Date(review.completed_at).toLocaleString('zh-CN') : '未完成'}</td></tr>
+                    <tr><td>状态</td><td>
+                        ${review.status === 'completed' ? '<span class="badge bg-success">已完成</span>' :
+                          review.status === 'failed' ? '<span class="badge bg-danger">失败</span>' :
+                          review.status === 'pending' ? '<span class="badge bg-primary">进行中</span>' :
+                          '<span class="badge bg-secondary">已取消</span>'}
+                    </td></tr>
+                    ${review.error_message ? `<tr><td>错误信息</td><td class="text-danger">${review.error_message}</td></tr>` : ''}
+                </table>
+            </div>
+        </div>
+
+        <div class="row mt-3">
+            <div class="col-12">
+                <h6>快速操作</h6>
+                <div class="btn-group" role="group">
+                    ${review.mr_url ? `
+                        <button class="btn btn-primary" onclick="openMR('${review.mr_url}')">
+                            <i class="bi bi-arrow-up-right-square"></i> 查看MR
+                        </button>
+                        <button class="btn btn-success" onclick="reviewAgain('${review.mr_url}')">
+                            <i class="bi bi-arrow-clockwise"></i> 重新审查
+                        </button>
+                    ` : ''}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function openMR(mrUrl) {
+    if (mrUrl) {
+        window.open(mrUrl, '_blank');
+    }
+}
+
+function reviewAgain(mrUrl) {
+    if (mrUrl) {
+        // 跳转到首页并填入MR URL
+        window.location.href = `/?mr_url=${encodeURIComponent(mrUrl)}`;
+    }
+}
+</script>
+{% endblock %}

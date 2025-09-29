@@ -455,6 +455,7 @@ def detect_models():
             'Content-Type': 'application/json'
         }
 
+        import requests
         response = requests.get(models_url, headers=headers, timeout=10)
 
         if response.status_code == 200:
@@ -474,10 +475,17 @@ def detect_models():
                 'error': f'API请求失败: {response.status_code} - {response.text}'
             }), 400
 
-    except requests.exceptions.Timeout:
-        return jsonify({'error': '请求超时，请检查API URL'}), 400
-    except requests.exceptions.ConnectionError:
-        return jsonify({'error': '连接失败，请检查API URL'}), 400
+    except Exception as e:
+        # 处理特定的requests异常
+        if 'requests' in locals() or 'requests' in globals():
+            if isinstance(e, requests.exceptions.Timeout):
+                return jsonify({'error': '请求超时，请检查API URL'}), 400
+            elif isinstance(e, requests.exceptions.ConnectionError):
+                return jsonify({'error': '连接失败，请检查API URL'}), 400
+        
+        # 处理其他异常
+        logger.error(f"Error in detect_models: {e}")
+        return jsonify({'error': f'探测模型失败: {str(e)}'}), 500
     except Exception as e:
         logger.error(f"Error in detect_models: {e}")
         return jsonify({'error': f'探测模型失败: {str(e)}'}), 500

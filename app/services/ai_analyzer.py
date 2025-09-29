@@ -71,41 +71,6 @@ class AICodeAnalyzer:
         except Exception as e:
             self.logger.error(f"Error validating model availability: {e}")
             return False
-        
-    def validate_model_availability(self) -> bool:
-        """验证AI模型是否可用"""
-        if not self.ai_api_key:
-            self.logger.warning("AI API key not configured")
-            return False
-            
-        try:
-            # 测试模型是否可用
-            import requests
-            headers = {
-                'Authorization': f'Bearer {self.ai_api_key}',
-                'Content-Type': 'application/json'
-            }
-            
-            # 尝试获取模型列表来测试连接
-            models_url = f"{self.ai_api_url.rstrip('/')}/models"
-            response = requests.get(models_url, headers=headers, timeout=10)
-            
-            if response.status_code == 200:
-                models_data = response.json()
-                # 检查指定的模型是否存在
-                if self.ai_model and 'data' in models_data:
-                    available_models = [model['id'] for model in models_data['data']]
-                    if self.ai_model not in available_models:
-                        self.logger.warning(f"Specified model '{self.ai_model}' not found in available models")
-                        return False
-                return True
-            else:
-                self.logger.error(f"Failed to validate model availability, status code: {response.status_code}")
-                return False
-                
-        except Exception as e:
-            self.logger.error(f"Error validating model availability: {e}")
-            return False
 
     def analyze_code_with_ai(self, context: AIAnalysisContext) -> List[CodeIssue]:
         """使用AI分析代码"""

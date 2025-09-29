@@ -401,9 +401,15 @@ class ReviewDatabase:
             date_params = (since_date, until_date)
         else:
             # 使用天数计算
-            since_date = (datetime.now() - timedelta(days=days)).isoformat()
-            where_clause = 'created_at > ?'
-            date_params = (since_date,)
+            if days is not None:
+                since_date = (datetime.now() - timedelta(days=days)).isoformat()
+                where_clause = 'created_at > ?'
+                date_params = (since_date,)
+            else:
+                # 默认30天
+                since_date = (datetime.now() - timedelta(days=30)).isoformat()
+                where_clause = 'created_at > ?'
+                date_params = (since_date,)
 
         if user_id is None:
             # 全局统计
@@ -463,6 +469,8 @@ class ReviewDatabase:
             end_dt = datetime.fromisoformat(end_date)
         else:
             end_dt = datetime.now()
+            # 如果days为None，默认使用30天
+            days = days if days is not None else 30
             start_dt = end_dt - timedelta(days=days)
 
         start_date_str = start_dt.isoformat()
@@ -587,6 +595,20 @@ class ReviewDatabase:
         cursor = conn.cursor()
 
         cursor.execute('DELETE FROM review_progress WHERE review_id = ?', (review_id,))
+
+        conn.commit()
+        conn.close()
+
+    def update_comments_posted_count(self, review_id: int, posted_count: int):
+        """更新已发布评论数量"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        cursor.execute('''
+            UPDATE reviews
+            SET comments_posted = comments_posted + ?
+            WHERE id = ?
+        ''', (posted_count, review_id))
 
         conn.commit()
         conn.close()
