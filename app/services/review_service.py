@@ -363,8 +363,27 @@ class ReviewService:
 
                 try:
                     # 获取变更的行号
-                    changed_lines = self._extract_changed_lines(change.get('diff', ''))
+                    diff_content = change.get('diff', '')
+                    changed_lines = self._extract_changed_lines(diff_content)
+
+                    # 添加详细的调试日志
+                    diff_size = len(diff_content)
+                    self.logger.info(f"Processing {file_path}: diff size = {diff_size} bytes, changed lines = {len(changed_lines)}")
+
                     if not changed_lines:
+                        if diff_size > 0:
+                            self.logger.warning(f"File {file_path} has diff content ({diff_size} bytes) but no changed lines found - possible large diff truncation")
+                            # 对于有diff但没有解析到变更行的情况，可能是大文件导致的diff截断
+                            if diff_size > 10000:  # 如果diff超过10KB，可能是大文件问题
+                                analyzed_files.append({
+                                    'file_path': file_path,
+                                    'issues_count': 0,
+                                    'issues': [],
+                                    'ai_issues': 0,
+                                    'skipped': True,
+                                    'skip_reason': f'文件变更过大 (diff: {diff_size} bytes)，无法解析变更行，已跳过审查'
+                                })
+                                continue
                         self.logger.info(f"No changed lines found in {file_path}, skipping")
                         continue
 
@@ -400,38 +419,54 @@ class ReviewService:
                         if ai_issues:
                             self.logger.info(f"AI analysis found {len(ai_issues)} issues in {file_path}")
 
+                        # 添加到分析文件列表（无论是否有问题都算分析过）
+                        analyzed_files.append({
+                            'file_path': file_path,
+                            'issues_count': len(ai_issues),
+                            'issues': ai_issues,
+                            'ai_issues': len(ai_issues)
+                        })
+
+                        if ai_issues:
+                            all_issues.extend(ai_issues)
+
+                            # 将问题保存到issue_records列表，稍后统一处理
+                            for issue in ai_issues:
+                                issue_records.append({'issue': issue, 'file_path': file_path})
+
+                            self.logger.info(f"Found {len(ai_issues)} AI issues in {file_path}")
+                        else:
+                            self.logger.info(f"No issues found in {file_path}")
+
                     except Exception as e:
-                        self.logger.error(f"AI analysis failed for {file_path}: {e}")
-                        # AI分析失败时，终止整个审查流程
-                        error_msg = f'AI代码分析失败: {str(e)}'
-                        if review_id:
-                            self.db.fail_review_record(review_id, error_msg)
-                        return {
-                            'success': False,
-                            'error': error_msg,
-                            'error_code': 'AI_ANALYSIS_FAILED',
-                            'review_id': review_id,
-                            'failed_file': file_path
-                        }
-
-                    # 添加到分析文件列表（无论是否有问题都算分析过）
-                    analyzed_files.append({
-                        'file_path': file_path,
-                        'issues_count': len(ai_issues),
-                        'issues': ai_issues,
-                        'ai_issues': len(ai_issues)
-                    })
-
-                    if ai_issues:
-                        all_issues.extend(ai_issues)
-
-                        # 将问题保存到issue_records列表，稍后统一处理
-                        for issue in ai_issues:
-                            issue_records.append({'issue': issue, 'file_path': file_path})
-
-                        self.logger.info(f"Found {len(ai_issues)} AI issues in {file_path}")
-                    else:
-                        self.logger.info(f"No issues found in {file_path}")
+                        error_message = str(e)
+                        # 检查是否是文件过大的错误
+                        if "文件过大警告" in error_message or "超过AI模型token限制" in error_message:
+                            # 文件过大，记录警告但继续处理其他文件
+                            self.logger.warning(f"Skipping large file {file_path}: {e}")
+                            # 添加到跳过文件列表，但不添加问题
+                            analyzed_files.append({
+                                'file_path': file_path,
+                                'issues_count': 0,
+                                'issues': [],
+                                'ai_issues': 0,
+                                'skipped': True,
+                                'skip_reason': error_message
+                            })
+                            continue
+                        else:
+                            # 其他AI分析错误，终止整个审查流程
+                            self.logger.error(f"AI analysis failed for {file_path}: {e}")
+                            error_msg = f'AI代码分析失败: {str(e)}'
+                            if review_id:
+                                self.db.fail_review_record(review_id, error_msg)
+                            return {
+                                'success': False,
+                                'error': error_msg,
+                                'error_code': 'AI_ANALYSIS_FAILED',
+                                'review_id': review_id,
+                                'failed_file': file_path
+                            }
 
                 except Exception as e:
                     self.logger.warning(f"Failed to analyze file {file_path}: {e}")
@@ -504,9 +539,13 @@ class ReviewService:
 
                     self.logger.error(f"Error preparing comment for {file_path}:{line_number}: {e}")
 
+            # 统计跳过的文件
+            skipped_files = [f for f in analyzed_files if f.get('skipped', False)]
+
             # 7. 完成审查记录
             analysis_summary = {
                 'total_files_analyzed': len(analyzed_files),
+                'total_files_skipped': len(skipped_files),
                 'total_issues_found': len(all_issues),
                 'error_count': len([i for i in all_issues if i.severity == 'error']),
                 'warning_count': len([i for i in all_issues if i.severity == 'warning']),
@@ -534,9 +573,12 @@ class ReviewService:
                 },
                 'analysis_summary': {
                     'total_files_analyzed': len(analyzed_files),
+                    'total_files_skipped': len(skipped_files),
                     'total_issues_found': len(all_issues),
                     'issues_by_severity': self._group_issues_by_severity(all_issues),
-                    'issues_by_category': self._group_issues_by_category(all_issues)
+                    'issues_by_category': self._group_issues_by_category(all_issues),
+                    'skipped_files': [{'file_path': f['file_path'], 'skip_reason': f['skip_reason']}
+                                    for f in skipped_files]
                 },
                 'files_analyzed': analyzed_files
             }

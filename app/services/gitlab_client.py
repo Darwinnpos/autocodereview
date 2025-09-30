@@ -64,7 +64,12 @@ class GitLabClient:
         print(f"DEBUG: Requesting MR changes from URL: {url}")
         print(f"DEBUG: Headers: {self.headers}")
 
-        response = requests.get(url, headers=self.headers)
+        # 添加参数以获取完整的diff信息
+        params = {
+            'access_raw_diffs': 'true'  # 获取原始diff
+        }
+
+        response = requests.get(url, headers=self.headers, params=params)
         print(f"DEBUG: Response status: {response.status_code}")
 
         if response.status_code != 200:
@@ -74,6 +79,18 @@ class GitLabClient:
         response_data = response.json()
         changes = response_data.get('changes', [])
         print(f"DEBUG: Found {len(changes)} changes in MR")
+
+        # 添加详细的diff调试信息
+        for i, change in enumerate(changes):
+            file_path = change.get('new_path') or change.get('old_path', 'unknown')
+            diff_content = change.get('diff', '')
+            print(f"DEBUG: Change {i}: file={file_path}, diff_size={len(diff_content)} bytes")
+            if len(diff_content) == 0:
+                print(f"DEBUG: No diff content for {file_path}")
+            else:
+                # 显示diff的前100个字符
+                diff_preview = diff_content[:100].replace('\n', '\\n')
+                print(f"DEBUG: Diff preview for {file_path}: {diff_preview}...")
 
         return changes
 

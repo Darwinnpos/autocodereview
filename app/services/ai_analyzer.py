@@ -96,16 +96,25 @@ class AICodeAnalyzer:
 
         except requests.exceptions.Timeout as e:
             self.logger.error(f"AI API timeout: {e}")
-            raise Exception(f"AI服务超时：请求超过120秒未响应，请稍后重试")
+            raise Exception(f"AI服务超时：请求超过600秒未响应，请稍后重试")
         except requests.exceptions.ConnectionError as e:
             self.logger.error(f"AI API connection error: {e}")
             raise Exception(f"AI服务连接失败：无法连接到AI API服务器，请检查网络连接和API URL配置")
         except requests.exceptions.HTTPError as e:
             status_code = e.response.status_code if e.response else 0
+            response_text = e.response.text if e.response else ""
+
             if status_code == 401:
                 raise Exception("AI服务认证失败：API密钥无效或已过期，请在个人资料中更新AI API密钥")
             elif status_code == 403:
                 raise Exception("AI服务权限不足：当前API密钥没有足够权限，请检查API密钥设置")
+            elif status_code == 400:
+                # 检查是否是token限制问题
+                if "token" in response_text.lower() or "length" in response_text.lower() or "too long" in response_text.lower():
+                    file_size_kb = len(context.file_content.encode('utf-8')) / 1024
+                    raise Exception(f"文件过大警告：{context.file_path} ({file_size_kb:.1f}KB) 超过AI模型token限制，已跳过此文件的审查。建议将大文件拆分为较小的文件。")
+                else:
+                    raise Exception(f"AI API请求格式错误：{response_text}")
             elif status_code == 429:
                 raise Exception("AI服务请求限制：API请求过于频繁，请稍后重试")
             elif status_code == 500:
@@ -375,6 +384,38 @@ class AICodeAnalyzer:
 
         return "\n\n".join(snippets)
 
+    def _extract_diff_snippets(self, diff_content: str, changed_lines: List[int]) -> str:
+        """从diff中提取变更片段，保留+/-标记显示变更类型"""
+        lines = diff_content.split('\n')
+        snippets = []
+        current_section = []
+        in_hunk = False
+
+        for line in lines:
+            if line.startswith('@@'):
+                # 新的差异块开始
+                if current_section:
+                    snippets.append('\n'.join(current_section))
+                    current_section = []
+                current_section.append(line)  # 添加hunk头
+                in_hunk = True
+            elif in_hunk:
+                if line.startswith('+++') or line.startswith('---'):
+                    continue  # 跳过文件头
+                elif line.startswith('+') or line.startswith('-') or line.startswith(' '):
+                    current_section.append(line)
+                elif line.strip() == '':
+                    current_section.append(line)
+                else:
+                    # 块结束
+                    in_hunk = False
+
+        # 添加最后一个section
+        if current_section:
+            snippets.append('\n'.join(current_section))
+
+        return '\n\n'.join(snippets)
+
     def _call_ai_api(self, prompt: str) -> Dict[str, Any]:
         """调用AI API"""
         url = f"{self.ai_api_url.rstrip('/')}/chat/completions"
@@ -398,7 +439,7 @@ class AICodeAnalyzer:
             ]
         }
 
-        response = requests.post(url, json=data, headers=headers, timeout=120)
+        response = requests.post(url, json=data, headers=headers, timeout=600)
         response.raise_for_status()
 
         return response.json()
