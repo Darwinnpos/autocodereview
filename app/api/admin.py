@@ -14,13 +14,20 @@ auth_db = AuthDatabase()
 
 def require_admin():
     """检查用户是否为管理员"""
+    print(f"Debug - session内容: {dict(session)}")
     if 'user_id' not in session:
+        print("Debug - session中没有user_id")
         return False, None
 
-    user = auth_db.get_user_by_id(session['user_id'])
+    user_id = session['user_id']
+    print(f"Debug - 用户ID: {user_id}")
+    user = auth_db.get_user_by_id(user_id)
+    print(f"Debug - 用户信息: {user}")
     if not user or user.role != 'admin':
+        print(f"Debug - 用户不存在或不是管理员, role: {user.role if user else 'None'}")
         return False, None
 
+    print(f"Debug - 管理员验证成功: {user.username}")
     return True, user
 
 
@@ -40,30 +47,34 @@ def get_admin_statistics():
         cursor.execute("SELECT COUNT(*) FROM users")
         total_users = cursor.fetchone()[0]
 
-        # 管理员数
-        cursor.execute("SELECT COUNT(*) FROM users WHERE role = 'admin'")
-        admin_count = cursor.fetchone()[0]
-
-        # 今日活跃用户数（根据最后登录时间）
-        today = datetime.now().date()
-        cursor.execute("SELECT COUNT(*) FROM users WHERE DATE(last_login) = ?", (today,))
-        today_active = cursor.fetchone()[0]
-
         # 本周新增用户数
         week_ago = datetime.now() - timedelta(days=7)
         cursor.execute("SELECT COUNT(*) FROM users WHERE created_at > ?", (week_ago.isoformat(),))
         new_this_week = cursor.fetchone()[0]
 
+        # 总登录次数
+        cursor.execute("SELECT SUM(login_count) FROM users")
+        total_logins = cursor.fetchone()[0] or 0
+
+        # 月度活跃用户数（根据最后登录时间）
+        month_ago_date = (datetime.now() - timedelta(days=30)).date()
+        cursor.execute("SELECT COUNT(*) FROM users WHERE DATE(last_login) >= ?", (month_ago_date,))
+        month_active = cursor.fetchone()[0]
+
         conn.close()
+
+        stats_data = {
+            'total_users': total_users,
+            'new_this_week': new_this_week,
+            'total_logins': total_logins,
+            'month_active': month_active
+        }
+
+        print(f"Debug - API返回的统计数据: {stats_data}")
 
         return jsonify({
             'success': True,
-            'statistics': {
-                'total_users': total_users,
-                'admin_count': admin_count,
-                'today_active': today_active,
-                'new_this_week': new_this_week
-            }
+            'statistics': stats_data
         })
 
     except Exception as e:

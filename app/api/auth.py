@@ -397,29 +397,6 @@ def update_user_status(target_user_id):
         return jsonify({'error': '服务器内部错误'}), 500
 
 
-@bp.route('/admin/statistics', methods=['GET'])
-def get_admin_statistics():
-    """获取管理员统计信息"""
-    try:
-        user_id = session.get('user_id')
-        if not user_id:
-            return jsonify({'error': '未登录'}), 401
-
-        current_user = auth_db.get_user_by_id(user_id)
-        if not current_user or current_user.role != 'admin':
-            return jsonify({'error': '权限不足'}), 403
-
-        stats = auth_db.get_user_statistics()
-
-        return jsonify({
-            'success': True,
-            'statistics': stats
-        }), 200
-
-    except Exception as e:
-        logger.error(f"Error in get_admin_statistics: {e}")
-        return jsonify({'error': '服务器内部错误'}), 500
-
 
 @bp.route('/detect-models', methods=['POST'])
 def detect_models():
