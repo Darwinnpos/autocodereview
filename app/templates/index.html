@@ -523,12 +523,27 @@ async function showFinalResult(reviewId) {
             // 隐藏进度卡片，显示结果
             progressCard.style.display = 'none';
 
+            // 格式化审查耗时
+            const formatDuration = (seconds) => {
+                if (!seconds) return '未知';
+                if (seconds < 60) return `${seconds}秒`;
+                const minutes = Math.floor(seconds / 60);
+                const remainingSeconds = seconds % 60;
+                if (minutes < 60) {
+                    return remainingSeconds > 0 ? `${minutes}分${remainingSeconds}秒` : `${minutes}分`;
+                }
+                const hours = Math.floor(minutes / 60);
+                const remainingMinutes = minutes % 60;
+                return remainingMinutes > 0 ? `${hours}小时${remainingMinutes}分` : `${hours}小时`;
+            };
+
             resultContent.innerHTML = `
                 <div class="alert alert-success">
                     <h6><i class="bi bi-check-circle"></i> 代码分析完成！</h6>
                     <p class="mb-1">已成功分析 ${data.analysis_summary.total_files_analyzed} 个文件</p>
                     <p class="mb-1">发现 ${data.analysis_summary.total_issues_found} 个问题</p>
-                    <p class="mb-0">生成了 ${data.pending_comments_count} 条待确认的评论</p>
+                    <p class="mb-1">生成了 ${data.pending_comments_count} 条待确认的评论</p>
+                    <p class="mb-0"><i class="bi bi-clock-history"></i> 审查耗时: ${formatDuration(data.duration_seconds)}</p>
                 </div>
                 <div class="row">
                     <div class="col-md-6">

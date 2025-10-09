@@ -609,11 +609,16 @@ class ReviewService:
             # 更新进度 - 完成
             self._update_progress(review_id, 'completed', processed_files, len(all_issues))
 
+            # 8. 计算审查耗时
+            review_record = self.db.get_review_record(review_id)
+            duration_seconds = self._calculate_review_duration(review_record)
+
             # 8. 返回结果
             result = {
                 'success': True,
                 'review_id': review_id,
                 'pending_comments_count': comments_prepared,
+                'duration_seconds': duration_seconds,  # 审查耗时（秒）
                 'mr_info': {
                     'title': mr_info.get('title'),
                     'author': mr_info.get('author', {}).get('name'),
@@ -633,7 +638,7 @@ class ReviewService:
                 'files_analyzed': analyzed_files
             }
 
-            self.logger.info(f"Code review completed for {mr_url}")
+            self.logger.info(f"Code review completed for {mr_url} in {duration_seconds}s")
             return result
 
         except Exception as e:
@@ -1204,10 +1209,14 @@ class ReviewService:
         # 获取待确认评论数量
         pending_comments = self.db.get_pending_comments(review_id)
 
+        # 计算审查耗时
+        duration_seconds = self._calculate_review_duration(review)
+
         # 构造结果数据
         result = {
             'review_id': review_id,
             'pending_comments_count': len(pending_comments),
+            'duration_seconds': duration_seconds,  # 审查耗时（秒）
             'mr_info': {
                 'title': review.get('mr_title'),
                 'author': review.get('mr_author'),
@@ -1368,3 +1377,36 @@ class ReviewService:
         except Exception as e:
             self.logger.error(f"Single Agent analysis failed for {file_path}: {e}")
             raise
+
+    def _calculate_review_duration(self, review_record: Dict) -> int:
+        """
+        计算审查耗时（秒）
+
+        Args:
+            review_record: 审查记录
+
+        Returns:
+            int: 审查耗时（秒），如果无法计算则返回0
+        """
+        if not review_record:
+            return 0
+
+        try:
+            created_at_str = review_record.get('created_at')
+            completed_at_str = review_record.get('completed_at')
+
+            if not created_at_str or not completed_at_str:
+                return 0
+
+            # 解析ISO格式时间字符串
+            from datetime import datetime
+            created_at = datetime.fromisoformat(created_at_str.replace('Z', '+00:00'))
+            completed_at = datetime.fromisoformat(completed_at_str.replace('Z', '+00:00'))
+
+            # 计算时间差（秒）
+            duration = (completed_at - created_at).total_seconds()
+            return int(duration)
+
+        except Exception as e:
+            self.logger.error(f"Error calculating review duration: {e}")
+            return 0
