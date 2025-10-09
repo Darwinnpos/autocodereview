@@ -27,18 +27,43 @@ def create_app(config_name='default'):
     from app.api.history import history_bp
     from app.api.admin import admin_bp
     from app.api.version import bp as version_bp
+    from app.api.authorization import authorization_bp
 
     app.register_blueprint(review_bp, url_prefix='/api')
     app.register_blueprint(auth_bp, url_prefix='/api')
     app.register_blueprint(history_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(version_bp)
+    app.register_blueprint(authorization_bp)
     # 注意：config_bp已废弃，配置功能已迁移到auth API
 
     # 初始化数据库连接池
     from app.utils.db_manager import get_auth_db_manager, get_review_db_manager
     get_auth_db_manager()  # 初始化认证数据库连接池
     get_review_db_manager()  # 初始化审查数据库连接池
+
+    # 初始化权限管理系统
+    from app.permissions.manager import PermissionManager
+    from app.api.authorization import init_authorization_api
+
+    # 权限管理配置
+    permission_config = {
+        'authorization': {
+            'request_timeout': 300,  # 5分钟
+            'max_pending_requests': 50
+        },
+        'enable_permission_caching': False,  # 生产环境可启用
+        'cache_ttl': 300
+    }
+
+    # 创建全局权限管理器
+    permission_manager = PermissionManager(permission_config)
+
+    # 初始化授权API
+    init_authorization_api(permission_manager)
+
+    # 将权限管理器存储在应用上下文中，供其他模块使用
+    app.permission_manager = permission_manager
 
     # 注册应用关闭处理
     import atexit
@@ -95,5 +120,9 @@ def create_app(config_name='default'):
     @app.route('/guide')
     def guide_page():
         return render_template('guide.html')
+
+    @app.route('/authorization')
+    def authorization_page():
+        return render_template('authorization.html')
 
     return app

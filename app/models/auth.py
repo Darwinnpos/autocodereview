@@ -29,6 +29,16 @@ class User:
     last_login: str
     login_count: int
 
+    @property
+    def ai_config(self) -> Dict:
+        """返回AI配置字典（兼容新Agent系统）"""
+        return {
+            'api_url': self.ai_api_url,
+            'api_key': self.ai_api_key,
+            'model': self.ai_model,
+            'review_severity_level': self.review_severity_level
+        }
+
 
 class AuthDatabase:
     """用户认证数据库管理"""

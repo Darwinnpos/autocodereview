@@ -7,10 +7,22 @@ from datetime import datetime
 from .gitlab_client import GitLabClient
 from .comment_generator import CommentGenerator
 from .ai_analyzer import AICodeAnalyzer, AIAnalysisContext, CodeIssue
+from .ai_agent import AICodeReviewAgent, AgentContext, AgentAnalysisResult
+# 新的模块化Agent导入
+from ..agents.analyzers.code_analyzer import CodeAnalyzer
+from ..agents.core.data_models import AgentContext as NewAgentContext
+# Agent编排系统导入
+from ..agents.orchestration.orchestrator import AgentOrchestrator
+from ..agents.orchestration.task_scheduler import TaskScheduler
+from ..agents.orchestration.resource_manager import ResourceManager
+# 权限管理导入
+from ..permissions.manager import PermissionManager
+from ..permissions.policies import SecurityContext, OperationType
 # UserConfig和UserConfigManager已废弃，现在使用AuthDatabase
 from ..models.review import ReviewDatabase
 from ..models.auth import AuthDatabase
 import threading
+from flask import current_app
 
 
 class ReviewService:
@@ -19,6 +31,10 @@ class ReviewService:
         self.db = ReviewDatabase(db_path)
         self.auth_db = AuthDatabase()
         self.logger = self._setup_logger()
+
+        # 初始化Agent编排系统
+        self._init_agent_orchestration()
+
         # 进度跟踪存储 (内存中临时存储)
         self._progress_storage = {}
         self._progress_lock = threading.Lock()
@@ -43,6 +59,51 @@ class ReviewService:
             logger.propagate = False
 
         return logger
+
+    def _init_agent_orchestration(self):
+        """初始化Agent编排系统"""
+        try:
+            # 获取权限管理器（从Flask应用上下文）
+            self.permission_manager = None
+            try:
+                if current_app:
+                    self.permission_manager = getattr(current_app, 'permission_manager', None)
+            except RuntimeError:
+                # 在测试或脚本环境中可能没有应用上下文
+                pass
+
+            # Agent编排配置
+            orchestration_config = {
+                'task_scheduler': {
+                    'max_parallel_tasks': 32,  # 并行任务数与Agent数一致
+                    'max_analysis_time_per_file': 600
+                },
+                'resource_manager': {
+                    'min_agents': 8,  # 默认启动8个并发Agent
+                    'max_agents': 32,  # 最大支持32个并发Agent
+                    'agent_timeout': 600,
+                    'auto_scale': True
+                }
+            }
+
+            # 初始化编排组件
+            self.task_scheduler = TaskScheduler(orchestration_config['task_scheduler'])
+            self.resource_manager = ResourceManager(orchestration_config['resource_manager'])
+            self.agent_orchestrator = AgentOrchestrator(
+                self.task_scheduler,
+                self.resource_manager,
+                orchestration_config
+            )
+
+            self.logger.info("Agent orchestration system initialized successfully")
+
+        except Exception as e:
+            self.logger.error(f"Failed to initialize agent orchestration: {e}")
+            # 回退到单Agent模式
+            self.task_scheduler = None
+            self.resource_manager = None
+            self.agent_orchestrator = None
+            self.logger.warning("Falling back to single-agent mode")
 
     def create_review_record(self, username: str, mr_url: str) -> int:
         """创建审查记录并返回review_id"""
@@ -255,17 +316,7 @@ class ReviewService:
             issue_records = []
 
             # 初始化AI分析器
-            if not user.ai_api_key:
-                error_msg = 'AI API密钥未配置，无法进行代码分析'
-                if review_id:
-                    self.db.fail_review_record(review_id, error_msg)
-                return {
-                    'success': False,
-                    'error': error_msg,
-                    'error_code': 'AI_CONFIG_ERROR',
-                    'review_id': review_id
-                }
-
+            # 检查API URL配置（API密钥对于本地服务可能不需要）
             if not user.ai_api_url:
                 error_msg = 'AI API URL未配置，无法进行代码分析'
                 if review_id:
@@ -398,26 +449,25 @@ class ReviewService:
                     # 更新进度 - 显示当前分析的文件
                     self._update_progress(review_id, 'analyzing', processed_files, len(all_issues), file_path)
 
-                    # AI分析
+                    # AI Agent分析 - 使用编排系统或回退到单Agent
                     ai_issues = []
                     try:
-                        # 创建AI分析上下文
-                        language = ai_analyzer.get_language_from_file_path(file_path)
-                        ai_context = AIAnalysisContext(
-                            file_path=file_path,
-                            file_content=file_content,
-                            changed_lines=changed_lines,
-                            diff_content=change.get('diff', ''),
-                            language=language,
-                            mr_title=mr_info.get('title', ''),
-                            mr_description=mr_info.get('description', ''),
-                            review_config=user.review_config
-                        )
+                        if self.agent_orchestrator:
+                            # 使用Agent编排系统进行分析
+                            ai_issues = self._analyze_with_orchestrator(
+                                file_path, file_content, changed_lines, change.get('diff', ''),
+                                mr_info, user, review_id
+                            )
+                        else:
+                            # 回退到单Agent模式
+                            ai_issues = self._analyze_with_single_agent(
+                                file_path, file_content, changed_lines, change.get('diff', ''),
+                                mr_info, user
+                            )
 
-                        # 调用AI分析
-                        ai_issues = ai_analyzer.analyze_code_with_ai(ai_context)
+                        # 记录分析结果
                         if ai_issues:
-                            self.logger.info(f"AI analysis found {len(ai_issues)} issues in {file_path}")
+                            self.logger.info(f"Agent analysis found {len(ai_issues)} issues in {file_path}")
 
                         # 添加到分析文件列表（无论是否有问题都算分析过）
                         analyzed_files.append({
@@ -1227,3 +1277,94 @@ class ReviewService:
 
         with self._cancellation_lock:
             return self._cancellation_flags.get(review_id, False)
+
+    def _analyze_with_orchestrator(self, file_path: str, file_content: str,
+                                  changed_lines: List[int], diff_content: str,
+                                  mr_info: Dict, user, review_id: int) -> List:
+        """使用Agent编排系统进行分析"""
+        try:
+            # 检查权限
+            if self.permission_manager:
+                security_context = SecurityContext(
+                    user_id=str(user.id),
+                    session_id=f"review_{review_id}",
+                    operation_type=OperationType.ANALYZE_CODE,
+                    resource_path=file_path
+                )
+
+                permission_decision = self.permission_manager.check_permission(security_context)
+                if not permission_decision.allowed:
+                    self.logger.warning(f"Code analysis permission denied for {file_path}")
+                    return []
+
+            # 创建MR变更数据（适配编排器接口）
+            mr_changes = [{
+                'new_path': file_path,
+                'diff': diff_content,
+                'file_content': file_content,
+                'changed_lines': changed_lines
+            }]
+
+            # 使用编排器处理
+            orchestration_result = self.agent_orchestrator.process_mr_review(
+                mr_changes, mr_info, user.ai_config
+            )
+
+            if orchestration_result.success:
+                # 提取该文件的分析结果
+                for file_result in orchestration_result.file_results:
+                    if file_result['file_path'] == file_path:
+                        return file_result['issues']
+
+                self.logger.warning(f"No results found for {file_path} in orchestration result")
+                return []
+            else:
+                self.logger.error(f"Orchestration failed for {file_path}: {orchestration_result.error}")
+                return []
+
+        except Exception as e:
+            self.logger.error(f"Error in orchestrated analysis for {file_path}: {e}")
+            # 回退到单Agent分析
+            return self._analyze_with_single_agent(
+                file_path, file_content, changed_lines, diff_content, mr_info, user
+            )
+
+    def _analyze_with_single_agent(self, file_path: str, file_content: str,
+                                  changed_lines: List[int], diff_content: str,
+                                  mr_info: Dict, user) -> List:
+        """单Agent分析（回退模式）"""
+        try:
+            # 使用新的模块化CodeAnalyzer
+            agent = CodeAnalyzer(user.ai_config)
+
+            # 创建新的Agent分析上下文
+            language = agent.get_language_from_file_path(file_path)
+            agent_context = NewAgentContext(
+                file_path=file_path,
+                file_content=file_content,
+                changed_lines=changed_lines,
+                diff_content=diff_content,
+                language=language,
+                mr_title=mr_info.get('title', ''),
+                mr_description=mr_info.get('description', ''),
+                review_config=user.review_config
+            )
+
+            # 使用模块化Agent进行分析
+            self.logger.info(f"Starting single Agent analysis for {file_path}")
+            agent_result = agent.analyze(agent_context)
+
+            # 转换Agent结果为兼容格式
+            ai_issues = agent.convert_to_code_issues(agent_result, file_path)
+
+            if ai_issues:
+                self.logger.info(f"Single Agent analysis found {len(ai_issues)} issues in {file_path} "
+                               f"(depth: {agent_result.analysis_depth}, "
+                               f"turns: {agent_result.conversation_turns}, "
+                               f"confidence: {agent_result.confidence_score:.2f})")
+
+            return ai_issues
+
+        except Exception as e:
+            self.logger.error(f"Single Agent analysis failed for {file_path}: {e}")
+            raise
