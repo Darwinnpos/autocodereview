@@ -765,6 +765,9 @@ function generateCommentHtml(comment, reviewId) {
                         <strong>${comment.file_path}:${comment.line_number}</strong>
                         <span class="badge bg-${getSeverityColor(comment.severity)} ms-2">${comment.severity}</span>
                         <span class="badge bg-secondary ms-1">${comment.category}</span>
+                        <span class="badge bg-${getConfidenceColor(comment.confidence)} ms-1" title="AI确信程度">
+                            ${formatConfidence(comment.confidence)}
+                        </span>
                     </label>
                 </div>
                 <div class="btn-group" role="group">
@@ -918,6 +921,21 @@ function getSeverityColor(severity) {
         case 'info': return 'info';
         default: return 'secondary';
     }
+}
+
+function getConfidenceColor(confidence) {
+    // 根据确信程度返回不同的颜色
+    confidence = parseFloat(confidence) || 0.8;
+    if (confidence >= 0.9) return 'success';      // 高确信度 - 绿色
+    if (confidence >= 0.7) return 'primary';      // 中等确信度 - 蓝色
+    if (confidence >= 0.5) return 'warning';      // 较低确信度 - 黄色
+    return 'danger';                              // 低确信度 - 红色
+}
+
+function formatConfidence(confidence) {
+    // 格式化确信程度为百分比
+    confidence = parseFloat(confidence) || 0.8;
+    return Math.round(confidence * 100) + '%';
 }
 
 function selectAllComments() {

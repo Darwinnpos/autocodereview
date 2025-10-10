@@ -211,8 +211,46 @@ class BaseAgent(ABC):
                     severity=issue_data.get('severity', 'info'),
                     category=issue_data.get('category', 'general'),
                     message=issue_data.get('message', ''),
-                    suggestion=issue_data.get('suggestion')
+                    suggestion=issue_data.get('suggestion'),
+                    confidence=issue_data.get('confidence', 0.8)
                 )
                 code_issues.append(code_issue)
 
-        return code_issues
+        # 根据严重程度等级过滤问题
+        filtered_issues = self._filter_issues_by_severity(code_issues)
+
+        return filtered_issues
+
+    def _filter_issues_by_severity(self, issues: list) -> list:
+        """根据严重程度等级过滤问题"""
+        if not issues:
+            return issues
+
+        # 获取severity_level配置（如果存在）
+        severity_level = getattr(self, 'severity_level', 'standard')
+
+        # 定义各等级允许的严重程度
+        allowed_severities = {
+            'strict': ['error', 'warning', 'info'],      # 严格模式：检查所有问题
+            'standard': ['error', 'warning'],            # 标准模式：检查错误和警告
+            'relaxed': ['error']                         # 宽松模式：只检查错误
+        }
+
+        current_allowed = allowed_severities.get(severity_level, ['error', 'warning'])
+
+        # 过滤问题
+        filtered_issues = []
+        for issue in issues:
+            # 检查issue是字典还是对象
+            if isinstance(issue, dict):
+                severity = issue.get('severity', 'info')
+            else:
+                severity = getattr(issue, 'severity', 'info')
+
+            if severity in current_allowed:
+                filtered_issues.append(issue)
+            else:
+                self.logger.debug(f"过滤掉严重程度为 {severity} 的问题（当前等级：{severity_level}）")
+
+        self.logger.info(f"严重程度过滤：{len(issues)} -> {len(filtered_issues)} （等级：{severity_level}）")
+        return filtered_issues

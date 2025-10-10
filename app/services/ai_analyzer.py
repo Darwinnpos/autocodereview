@@ -13,6 +13,7 @@ class CodeIssue:
     category: str  # 'security', 'performance', 'quality', 'best_practices', 'logic'
     message: str
     suggestion: Optional[str] = None
+    confidence: float = 0.8  # AI 确信程度 (0.0-1.0)
 
 
 @dataclass
@@ -332,8 +333,15 @@ class AICodeAnalyzer:
 
 **分析要求**:
 - 只分析新增/修改的代码行及其直接相关的上下文
+- **只报告需要改进的问题，不要报告好的实践或正面观察**
 - 重点关注修改后的代码可能存在的问题
 - 不要分析整个文件，只关注变更部分
+
+**重要说明**：
+- ✅ 只报告存在问题、需要改进的代码
+- ❌ 不要报告"命名规范良好"、"代码格式正确"等正面内容
+- ❌ 不要把好的实践当作问题报告
+- 如果代码质量良好、没有发现问题，返回空数组[]
 
 请以JSON格式返回分析结果，格式如下：
 ```json
@@ -342,7 +350,7 @@ class AICodeAnalyzer:
     "line_number": 行号,
     "severity": "error|warning|info",
     "category": "security|performance|quality|best_practices|logic",
-    "message": "问题描述（描述修改后代码的问题）",
+    "message": "问题描述（只描述需要改进的问题）",
     "suggestion": "具体的修改建议（针对当前修改后的代码）",
     "confidence": 0.8
   }}
@@ -351,11 +359,16 @@ class AICodeAnalyzer:
 
 要求：
 - 只返回JSON，不要其他文字
-- line_number必须是新增/修改行中的一个
+- **line_number必须精确指向问题所在的代码行，且必须是新增/修改行之一（第{', '.join(map(str, context.changed_lines))}行）**
+- 对于跨多行的问题，选择问题**最明显出现**的那一行，而不是空行或注释行
 - severity: error(严重问题), warning(潜在问题), info(建议优化)
 - confidence: 0.0-1.0，表示问题的确信度
 - message和suggestion都应该针对修改**后**的代码
 - 如果没有问题，返回空数组[]
+
+**行号选择示例**：
+✅ 正确：如果函数声明存在问题，选择函数声明所在行（如第14行的函数定义）
+❌ 错误：选择函数后面的空行（如第19行）来报告函数的问题
 """
 
         return prompt
@@ -470,8 +483,24 @@ class AICodeAnalyzer:
                 # 验证line_number是否在变更行中
                 line_number = issue_data.get('line_number', 0)
                 if line_number not in context.changed_lines:
-                    self.logger.warning(f"AI returned line {line_number} not in changed lines {context.changed_lines}")
-                    continue
+                    # 尝试找到最近的变更行
+                    if context.changed_lines:
+                        closest_line = min(context.changed_lines, key=lambda x: abs(x - line_number))
+                        if abs(closest_line - line_number) <= 3:  # 如果在3行范围内，调整
+                            self.logger.warning(
+                                f"AI returned line {line_number} not in changed lines, "
+                                f"adjusting to closest changed line {closest_line}. "
+                                f"Changed lines: {context.changed_lines}"
+                            )
+                            line_number = closest_line
+                        else:
+                            self.logger.warning(
+                                f"AI returned line {line_number} too far from changed lines {context.changed_lines}, skipping"
+                            )
+                            continue
+                    else:
+                        self.logger.warning(f"No changed lines available, skipping issue at line {line_number}")
+                        continue
 
                 # 验证必需字段
                 if not all(key in issue_data for key in ['severity', 'category', 'message']):
@@ -483,7 +512,8 @@ class AICodeAnalyzer:
                     severity=issue_data['severity'],
                     category=issue_data['category'],
                     message=issue_data['message'],
-                    suggestion=issue_data.get('suggestion', '请考虑修改此处代码')
+                    suggestion=issue_data.get('suggestion', '请考虑修改此处代码'),
+                    confidence=issue_data.get('confidence', 0.8)
                 )
 
                 code_issues.append(code_issue)

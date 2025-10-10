@@ -90,3 +90,4 @@ class CodeIssue:
     category: str       # 'security', 'performance', 'quality', 'best_practices', 'logic'
     message: str
     suggestion: Optional[str] = None
+    confidence: float = 0.8  # AI 确信程度 (0.0-1.0)

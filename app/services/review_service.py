@@ -612,6 +612,7 @@ class ReviewService:
                             'category': issue.get('category', 'general'),
                             'message': issue.get('message', ''),
                             'suggestion': issue.get('suggestion', ''),
+                            'confidence': issue.get('confidence', 0.8),
                             'comment_text': comment_text
                         }
                     else:
@@ -622,6 +623,7 @@ class ReviewService:
                             'category': getattr(issue, 'category', 'general'),
                             'message': getattr(issue, 'message', ''),
                             'suggestion': getattr(issue, 'suggestion', ''),
+                            'confidence': getattr(issue, 'confidence', 0.8),
                             'comment_text': comment_text
                         }
 
@@ -1102,25 +1104,40 @@ class ReviewService:
         return '\n'.join(content_lines)
 
     def _extract_changed_lines(self, diff: str) -> List[int]:
-        """从diff中提取变更的行号"""
+        """从diff中提取变更的行号（新文件中的行号）"""
         lines = diff.split('\n')
         changed_lines = []
-        current_line = 0
+        current_new_line = 0  # 新文件的当前行号
+
+        import re
 
         for line in lines:
             if line.startswith('@@'):
-                # 解析行号范围
-                import re
-                match = re.search(r'@@ -\d+,?\d* \+(\d+),?\d* @@', line)
+                # 解析新文件的起始行号: @@ -老行号,老行数 +新行号,新行数 @@
+                match = re.search(r'@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@', line)
                 if match:
-                    current_line = int(match.group(1)) - 1
-            elif line.startswith('+') and not line.startswith('+++'):
-                current_line += 1
-                changed_lines.append(current_line)
-            elif not line.startswith('-') and not line.startswith('\\'):
-                if not line.startswith('+++') and not line.startswith('---') and not line.startswith('@@'):
-                    current_line += 1
+                    # 新文件起始行号（下一行就是这个行号）
+                    current_new_line = int(match.group(1)) - 1
+                    self.logger.debug(f"Diff hunk starts at new line {current_new_line + 1}")
+            elif line.startswith('+++') or line.startswith('---'):
+                # 文件头，跳过
+                continue
+            elif line.startswith('+'):
+                # 新增行（在新文件中）
+                current_new_line += 1
+                changed_lines.append(current_new_line)
+                self.logger.debug(f"Added line: {current_new_line} -> {line[:60]}")
+            elif line.startswith('-'):
+                # 删除行（不在新文件中，不增加新行号）
+                pass
+            elif line.startswith('\\'):
+                # 特殊标记（如"\ No newline at end of file"），跳过
+                pass
+            else:
+                # 上下文行（在新旧文件中都存在）
+                current_new_line += 1
 
+        self.logger.info(f"Extracted changed lines: {changed_lines}")
         return changed_lines
 
     def _group_issues_by_severity(self, issues: List[CodeIssue]) -> Dict[str, int]:

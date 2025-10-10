@@ -54,6 +54,7 @@ class ReviewDatabase:
                 comment_text TEXT NOT NULL,
                 comment_status TEXT DEFAULT 'pending',
                 gitlab_comment_id TEXT,
+                confidence REAL DEFAULT 0.8,
                 created_at TEXT NOT NULL,
                 confirmed_at TEXT,
                 FOREIGN KEY (review_id) REFERENCES reviews (id)
@@ -62,6 +63,12 @@ class ReviewDatabase:
 
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_issues_review_id ON issues (review_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_issues_status ON issues (comment_status)')
+
+        # 数据库迁移：为现有数据库添加 confidence 字段
+        cursor.execute("PRAGMA table_info(issues)")
+        columns = [column[1] for column in cursor.fetchall()]
+        if 'confidence' not in columns:
+            cursor.execute('ALTER TABLE issues ADD COLUMN confidence REAL DEFAULT 0.8')
 
         # 创建进度表
         cursor.execute('''
@@ -180,8 +187,8 @@ class ReviewDatabase:
         cursor.execute('''
             INSERT INTO issues (
                 review_id, file_path, line_number, severity, category,
-                message, suggestion, comment_text, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                message, suggestion, comment_text, confidence, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             review_id,
             issue_data['file_path'],
@@ -191,6 +198,7 @@ class ReviewDatabase:
             issue_data['message'],
             issue_data.get('suggestion'),
             issue_data['comment_text'],
+            issue_data.get('confidence', 0.8),  # 默认值 0.8
             datetime.now().isoformat()
         ))
 
