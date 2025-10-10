@@ -214,20 +214,41 @@ class ConversationManager:
         Returns:
             str: 格式化的代码上下文
         """
+        # 将文件内容按行分割并添加行号，标注变更行
+        lines = context.file_content.split('\n')
+        changed_lines_set = set(context.changed_lines)
+
+        numbered_content = []
+        for i, line in enumerate(lines, 1):
+            # 如果是变更行，添加 >>> 标记
+            if i in changed_lines_set:
+                numbered_content.append(f"{i:4d} >>> {line}")
+            else:
+                numbered_content.append(f"{i:4d}     {line}")
+
+        file_with_line_numbers = '\n'.join(numbered_content)
+
         return f"""
 ## 代码文件信息
 文件路径：{context.file_path}
 编程语言：{context.language}
 变更行数：{len(context.changed_lines)}
+变更的行号：{sorted(context.changed_lines) if len(context.changed_lines) <= 20 else f"{len(context.changed_lines)}行"}
 
 ## 变更内容
 ```diff
 {context.diff_content}
 ```
 
-## 完整文件内容
+## 完整文件内容（带行号，>>> 标记为变更行）
+**重要说明**：
+- 每行前面的数字是行号
+- 标记 ">>>" 的行是本次MR变更的行
+- 你报告的 line_number 必须是这些带 ">>>" 标记的行号
+- 不要报告未变更行的问题（除非它直接影响变更行）
+
 ```{context.language}
-{context.file_content}
+{file_with_line_numbers}
 ```
 """
 

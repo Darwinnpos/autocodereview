@@ -807,7 +807,7 @@ class ReviewService:
             return None
 
     def _get_code_context_for_review(self, review: Dict, file_path: str, line_number: int, context_lines: int = 5) -> Dict:
-        """为指定审查获取代码上下文"""
+        """为指定审查获取代码上下文（包含 diff 信息）"""
         try:
             # 获取用户配置 - 尝试不同的方法获取用户
             user = None
@@ -824,6 +824,27 @@ class ReviewService:
 
             # 创建GitLab客户端
             gitlab_client = GitLabClient(user.gitlab_url, user.access_token)
+
+            # 获取 MR changes 以获取 diff 信息
+            try:
+                changes = gitlab_client.get_mr_changes(review['project_id'], review['mr_iid'])
+                # 找到对应文件的 diff
+                file_diff = None
+                changed_lines_set = set()
+                line_types = {'added_lines': set(), 'deleted_lines': [], 'line_mapping': {}}
+
+                for change in changes:
+                    if change.get('new_path') == file_path or change.get('old_path') == file_path:
+                        file_diff = change.get('diff', '')
+                        # 提取变更行号和类型信息
+                        changed_lines_set = set(self._extract_changed_lines(file_diff))
+                        line_types = self._extract_line_types_from_diff(file_diff)
+                        break
+            except Exception as e:
+                self.logger.warning(f"Could not get diff for {file_path}: {e}")
+                file_diff = None
+                changed_lines_set = set()
+                line_types = {'added_lines': set(), 'deleted_lines': [], 'line_mapping': {}}
 
             # 获取文件内容
             file_content = gitlab_client.get_file_content(
@@ -849,7 +870,10 @@ class ReviewService:
                 self.logger.warning(f"Target line {line_number} out of range for file {file_path}")
                 return None
 
-            # 提取上下文行
+            # 提取上下文行（标记是否为变更行，以及是新增还是修改）
+            added_lines = line_types.get('added_lines', set())
+            deleted_mapping = line_types.get('line_mapping', {})
+
             lines_before = []
             lines_after = []
             target_line = lines[target_index] if target_index < len(lines) else ''
@@ -857,29 +881,78 @@ class ReviewService:
             # 获取目标行之前的行
             for i in range(start_line - 1, target_index):
                 if i >= 0 and i < len(lines):
+                    line_num = i + 1
+                    # 先检查这一行之前是否有删除的行
+                    if line_num in deleted_mapping:
+                        # 插入删除的行
+                        for old_line_num, deleted_content in deleted_mapping[line_num]:
+                            lines_before.append({
+                                'line_number': f"~{old_line_num}",  # 使用特殊标记表示删除的行
+                                'content': deleted_content,
+                                'is_deleted': True,
+                                'is_changed': False,
+                                'is_added': False
+                            })
+
                     lines_before.append({
-                        'line_number': i + 1,
-                        'content': lines[i]
+                        'line_number': line_num,
+                        'content': lines[i],
+                        'is_changed': line_num in changed_lines_set,
+                        'is_added': line_num in added_lines,
+                        'is_deleted': False
                     })
 
             # 获取目标行之后的行
             for i in range(target_index + 1, min(len(lines), end_line)):
+                line_num = i + 1
+                # 先检查这一行之前是否有删除的行
+                if line_num in deleted_mapping:
+                    # 插入删除的行
+                    for old_line_num, deleted_content in deleted_mapping[line_num]:
+                        lines_after.append({
+                            'line_number': f"~{old_line_num}",
+                            'content': deleted_content,
+                            'is_deleted': True,
+                            'is_changed': False,
+                            'is_added': False
+                        })
+
                 lines_after.append({
-                    'line_number': i + 1,
-                    'content': lines[i]
+                    'line_number': line_num,
+                    'content': lines[i],
+                    'is_changed': line_num in changed_lines_set,
+                    'is_added': line_num in added_lines,
+                    'is_deleted': False
                 })
+
+            # 处理目标行（检查是否有删除行在其之前）
+            target_deleted_lines = []
+            if line_number in deleted_mapping:
+                for old_line_num, deleted_content in deleted_mapping[line_number]:
+                    target_deleted_lines.append({
+                        'line_number': f"~{old_line_num}",
+                        'content': deleted_content,
+                        'is_deleted': True,
+                        'is_changed': False,
+                        'is_added': False
+                    })
 
             return {
                 'lines_before': lines_before,
+                'target_deleted_lines': target_deleted_lines,  # 目标行之前的删除行
                 'target_line': {
                     'line_number': line_number,
-                    'content': target_line
+                    'content': target_line,
+                    'is_changed': line_number in changed_lines_set,
+                    'is_added': line_number in added_lines,
+                    'is_deleted': False
                 },
                 'lines_after': lines_after,
                 'start_line_number': start_line,
                 'end_line_number': end_line,
                 'target_line_number': line_number,
-                'file_path': file_path
+                'file_path': file_path,
+                'has_diff_info': bool(file_diff)
             }
 
         except Exception as e:
@@ -1139,6 +1212,63 @@ class ReviewService:
 
         self.logger.info(f"Extracted changed lines: {changed_lines}")
         return changed_lines
+
+    def _extract_line_types_from_diff(self, diff: str) -> Dict:
+        """从diff中提取详细的行类型信息
+
+        Returns:
+            Dict with:
+                - added_lines: set of new line numbers (added)
+                - deleted_lines: list of (old_line_num, content) tuples
+                - line_mapping: dict mapping new_line_num to nearby deleted lines
+        """
+        import re
+        lines = diff.split('\n')
+
+        added_lines = set()
+        deleted_lines = []  # (old_line_num, content)
+        line_mapping = {}  # new_line_num -> list of nearby deleted lines
+
+        current_old_line = 0
+        current_new_line = 0
+        pending_deletes = []  # Track deletes before the next add/context
+
+        for line in lines:
+            if line.startswith('@@'):
+                # Parse both old and new starting line numbers
+                match = re.search(r'@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@', line)
+                if match:
+                    current_old_line = int(match.group(1)) - 1
+                    current_new_line = int(match.group(2)) - 1
+                    pending_deletes = []
+            elif line.startswith('+++') or line.startswith('---'):
+                continue
+            elif line.startswith('+'):
+                # Added line
+                current_new_line += 1
+                added_lines.add(current_new_line)
+                # Associate pending deletes with this new line
+                if pending_deletes:
+                    line_mapping[current_new_line] = pending_deletes.copy()
+                    pending_deletes = []
+            elif line.startswith('-'):
+                # Deleted line
+                current_old_line += 1
+                deleted_lines.append((current_old_line, line[1:]))  # Remove '-' prefix
+                pending_deletes.append((current_old_line, line[1:]))
+            elif line.startswith('\\'):
+                pass
+            else:
+                # Context line
+                current_old_line += 1
+                current_new_line += 1
+                pending_deletes = []  # Clear pending deletes at context
+
+        return {
+            'added_lines': added_lines,
+            'deleted_lines': deleted_lines,
+            'line_mapping': line_mapping
+        }
 
     def _group_issues_by_severity(self, issues: List[CodeIssue]) -> Dict[str, int]:
         """按严重程度分组问题"""

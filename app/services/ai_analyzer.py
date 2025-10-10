@@ -302,15 +302,32 @@ class AICodeAnalyzer:
             context.file_content, context.changed_lines
         )
 
+        # 构建带行号的完整代码
+        lines = context.file_content.split('\n')
+        changed_lines_set = set(context.changed_lines)
+        numbered_content = []
+        for i, line in enumerate(lines, 1):
+            # 如果是变更行，添加 >>> 标记
+            if i in changed_lines_set:
+                numbered_content.append(f"{i:4d} >>> {line}")
+            else:
+                numbered_content.append(f"{i:4d}     {line}")
+        file_with_line_numbers = '\n'.join(numbered_content)
+
         prompt = f"""你是一个专业的代码审查专家。请分析以下代码变更，重点关注新增和修改的部分。
 
 **文件路径**: {context.file_path}
 **编程语言**: {context.language}
 **MR标题**: {context.mr_title}
 
-**修改后的完整源代码** (当前版本):
+**修改后的完整源代码（带行号，>>> 标记变更行）**:
+**重要说明**：
+- 每行前面的数字是行号
+- 标记 ">>>" 的行是本次MR变更的行
+- 你报告的 line_number 必须是这些带 ">>>" 标记的行号
+
 ```{context.language}
-{context.file_content}
+{file_with_line_numbers}
 ```
 
 **代码变更差异(diff)** (显示从旧版本到新版本的变化):
@@ -357,18 +374,43 @@ class AICodeAnalyzer:
 ]
 ```
 
+**在提交每个问题前，请进行自我检查**：
+1. ✓ 回到完整文件内容，确认该行号标记了 ">>>"
+2. ✓ 如果附近有多个 ">>>" 行，确认选择的是"原因"行而非"结果"行
+3. ✓ 确认问题描述准确且针对变更后的代码
+
 要求：
 - 只返回JSON，不要其他文字
-- **line_number必须精确指向问题所在的代码行，且必须是新增/修改行之一（第{', '.join(map(str, context.changed_lines))}行）**
+- **line_number必须精确指向问题所在的代码行，且必须是带 ">>>" 标记的变更行（第{', '.join(map(str, context.changed_lines))}行）**
 - 对于跨多行的问题，选择问题**最明显出现**的那一行，而不是空行或注释行
 - severity: error(严重问题), warning(潜在问题), info(建议优化)
 - confidence: 0.0-1.0，表示问题的确信度
 - message和suggestion都应该针对修改**后**的代码
 - 如果没有问题，返回空数组[]
 
-**行号选择示例**：
-✅ 正确：如果函数声明存在问题，选择函数声明所在行（如第14行的函数定义）
-❌ 错误：选择函数后面的空行（如第19行）来报告函数的问题
+**行号选择规则（严格遵守）**：
+1. 只能选择标记了 ">>>" 的变更行
+2. **"原因"优先于"结果"原则**：选择引入问题的行，而不是受影响的行
+3. **当多行都是变更行时的优先级**：
+   - 控制语句（if/while/for）> 语句块内容
+   - 函数/类声明 > 函数/类内部
+   - 变量定义 > 变量使用
+   - 资源分配 > 资源释放
+
+**示例1：都是变更行时的选择**
+```
+  15 >>>     if (condition) {{           // 控制语句（原因）
+  16 >>>         statement;              // 语句块内容（结果）
+```
+如果问题是条件判断逻辑，选择第15行（控制流起点）
+
+**示例2：只有部分是变更行**
+```
+  17          if (b == 0) {{              // 旧代码，未变更
+  18 >>>      }}
+  19 >>>      return a / b;               // 新增的行
+```
+虽然问题根源在第17行，但它不是变更行，选择第19行（最相关的变更行）
 """
 
         return prompt

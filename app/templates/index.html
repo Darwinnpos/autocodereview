@@ -542,8 +542,7 @@ async function showFinalResult(reviewId) {
                     <h6><i class="bi bi-check-circle"></i> 代码分析完成！</h6>
                     <p class="mb-1">已成功分析 ${data.analysis_summary.total_files_analyzed} 个文件</p>
                     <p class="mb-1">发现 ${data.analysis_summary.total_issues_found} 个问题</p>
-                    <p class="mb-1">生成了 ${data.pending_comments_count} 条待确认的评论</p>
-                    <p class="mb-0">审查耗时: ${formatDuration(data.duration_seconds)}</p>
+                    <p class="mb-0">生成了 ${data.pending_comments_count} 条待确认的评论</p>
                 </div>
                 <div class="row">
                     <div class="col-md-6">
@@ -933,9 +932,12 @@ function getConfidenceColor(confidence) {
 }
 
 function formatConfidence(confidence) {
-    // 格式化确信程度为百分比
+    // 格式化确信程度为文字描述
     confidence = parseFloat(confidence) || 0.8;
-    return Math.round(confidence * 100) + '%';
+    if (confidence >= 0.9) return '非常确定';
+    if (confidence >= 0.7) return '很确定';
+    if (confidence >= 0.5) return '较确定';
+    return '不太确定';
 }
 
 function selectAllComments() {
@@ -1068,35 +1070,115 @@ function renderCodeContext(context) {
     // 使用数组拼接而非字符串连接，提高性能
     const lines = [];
 
-    // 渲染前面的行（白底灰色文字）
+    // 渲染前面的行
     if (context.lines_before && context.lines_before.length > 0) {
         context.lines_before.forEach(line => {
-            lines.push(`<div class="code-line context-line" style="background-color: white; color: #495057; padding: 4px 12px; border-left: 2px solid #dee2e6; line-height: 1.4;">
-                <span class="line-number" style="color: #6c757d; margin-right: 16px; min-width: 45px; display: inline-block; font-family: 'Consolas', 'Monaco', monospace; text-align: right;">${line.line_number}</span>
-                <span class="line-content" style="font-family: 'Consolas', 'Monaco', 'Courier New', monospace; white-space: pre; tab-size: 4;">${preserveSpaces(escapeHtml(line.content))}</span>
-            </div>`);
+            lines.push(renderSingleLine(line));
         });
     }
 
-    // 渲染目标行（红色左边框表示问题行）
-    if (context.target_line) {
-        lines.push(`<div class="code-line target-line" style="background-color: #fff5f5; color: #d63384; padding: 4px 12px; border-left: 4px solid #dc3545; line-height: 1.4; font-weight: 500;">
-            <span class="line-number" style="color: #dc3545; margin-right: 16px; min-width: 45px; display: inline-block; font-family: 'Consolas', 'Monaco', monospace; text-align: right; font-weight: bold;">${context.target_line.line_number}</span>
-            <span class="line-content" style="font-family: 'Consolas', 'Monaco', 'Courier New', monospace; white-space: pre; tab-size: 4;">${preserveSpaces(escapeHtml(context.target_line.content))}</span>
-        </div>`);
+    // 渲染目标行之前的删除行
+    if (context.target_deleted_lines && context.target_deleted_lines.length > 0) {
+        context.target_deleted_lines.forEach(line => {
+            lines.push(renderSingleLine(line));
+        });
     }
 
-    // 渲染后面的行（白底灰色文字）
+    // 渲染目标行（问题行）
+    if (context.target_line) {
+        lines.push(renderTargetLine(context.target_line));
+    }
+
+    // 渲染后面的行
     if (context.lines_after && context.lines_after.length > 0) {
         context.lines_after.forEach(line => {
-            lines.push(`<div class="code-line context-line" style="background-color: white; color: #495057; padding: 4px 12px; border-left: 2px solid #dee2e6; line-height: 1.4;">
-                <span class="line-number" style="color: #6c757d; margin-right: 16px; min-width: 45px; display: inline-block; font-family: 'Consolas', 'Monaco', monospace; text-align: right;">${line.line_number}</span>
-                <span class="line-content" style="font-family: 'Consolas', 'Monaco', 'Courier New', monospace; white-space: pre; tab-size: 4;">${preserveSpaces(escapeHtml(line.content))}</span>
-            </div>`);
+            lines.push(renderSingleLine(line));
         });
     }
 
     return lines.join('');
+}
+
+function renderSingleLine(line) {
+    // 根据行的类型选择背景颜色和边框
+    let bgColor, borderColor, textColor, lineNumberColor, prefix;
+
+    // 处理行号（移除删除行的 ~ 前缀）
+    let displayLineNumber = line.line_number;
+    if (typeof displayLineNumber === 'string' && displayLineNumber.startsWith('~')) {
+        displayLineNumber = displayLineNumber.substring(1);
+    }
+
+    if (line.is_deleted) {
+        // 删除行 - 红色背景
+        bgColor = '#ffeef0';
+        borderColor = '#f85149';
+        textColor = '#82071e';
+        lineNumberColor = '#f85149';
+        prefix = '-';
+    } else if (line.is_added) {
+        // 新增行 - 绿色背景
+        bgColor = '#e6ffec';
+        borderColor = '#2da44e';
+        textColor = '#055d20';
+        lineNumberColor = '#2da44e';
+        prefix = '+';
+    } else if (line.is_changed) {
+        // 修改行 - 黄色背景
+        bgColor = '#fff9db';
+        borderColor = '#f7dc6f';
+        textColor = '#2c3e50';
+        lineNumberColor = '#6c757d';
+        prefix = ' ';  // 单个空格
+    } else {
+        // 未变更行 - 白色背景
+        bgColor = 'white';
+        borderColor = '#dee2e6';
+        textColor = '#495057';
+        lineNumberColor = '#6c757d';
+        prefix = ' ';  // 单个空格
+    }
+
+    return `<div class="code-line context-line" style="background-color: ${bgColor}; color: ${textColor}; padding: 4px 12px; border-left: 2px solid ${borderColor}; line-height: 1.4;">
+        <span class="line-prefix" style="color: ${lineNumberColor}; margin-right: 8px; width: 12px; display: inline-block; text-align: center; font-family: 'Consolas', 'Monaco', monospace; font-weight: bold;">${prefix}</span>
+        <span class="line-number" style="color: ${lineNumberColor}; margin-right: 12px; min-width: 45px; display: inline-block; font-family: 'Consolas', 'Monaco', monospace; text-align: right;">${displayLineNumber}</span>
+        <span class="line-content" style="font-family: 'Consolas', 'Monaco', 'Courier New', monospace; white-space: pre; tab-size: 4;">${preserveSpaces(escapeHtml(line.content))}</span>
+    </div>`;
+}
+
+function renderTargetLine(line) {
+    // 目标行（报告问题的行）- 使用红色粗边框高亮，但背景根据类型变化
+    let bgColor, textColor, prefix;
+
+    // 处理行号（移除删除行的 ~ 前缀）
+    let displayLineNumber = line.line_number;
+    if (typeof displayLineNumber === 'string' && displayLineNumber.startsWith('~')) {
+        displayLineNumber = displayLineNumber.substring(1);
+    }
+
+    if (line.is_deleted) {
+        bgColor = '#ffeef0';
+        textColor = '#82071e';
+        prefix = '-';
+    } else if (line.is_added) {
+        bgColor = '#e6ffec';
+        textColor = '#055d20';
+        prefix = '+';
+    } else if (line.is_changed) {
+        bgColor = '#fff9db';
+        textColor = '#2c3e50';
+        prefix = ' ';
+    } else {
+        bgColor = '#fff5f5';
+        textColor = '#d63384';
+        prefix = ' ';
+    }
+
+    return `<div class="code-line target-line" style="background-color: ${bgColor}; color: ${textColor}; padding: 4px 12px; border-left: 4px solid #dc3545; line-height: 1.4; font-weight: 500;">
+        <span class="line-prefix" style="color: #dc3545; margin-right: 8px; width: 12px; display: inline-block; text-align: center; font-family: 'Consolas', 'Monaco', monospace; font-weight: bold;">${prefix}</span>
+        <span class="line-number" style="color: #dc3545; margin-right: 12px; min-width: 45px; display: inline-block; font-family: 'Consolas', 'Monaco', monospace; text-align: right; font-weight: bold;">${displayLineNumber}</span>
+        <span class="line-content" style="font-family: 'Consolas', 'Monaco', 'Courier New', monospace; white-space: pre; tab-size: 4;">${preserveSpaces(escapeHtml(line.content))}</span>
+    </div>`;
 }
 
 function preserveSpaces(text) {
