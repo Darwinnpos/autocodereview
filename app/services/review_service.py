@@ -390,142 +390,200 @@ class ReviewService:
             # 额外的日志用于调试
             self.logger.info(f"Progress initialized immediately for review {review_id} with {total_files} files")
 
-            processed_files = 0
-            for change in changes:
-                # 检查是否被取消
-                if self._is_review_cancelled(review_id):
-                    self.logger.info(f"Review {review_id} was cancelled, stopping analysis")
-                    self.db.cancel_review_record(review_id, "用户手动取消")
-                    return {
-                        'success': False,
-                        'error': '审查已被用户取消',
-                        'error_code': 'CANCELLED_BY_USER',
-                        'review_id': review_id
-                    }
-
-                if change.get('deleted_file', False):
-                    continue  # 跳过已删除的文件
-
-                file_path = change.get('new_path') or change.get('old_path')
-                if not file_path:
-                    continue
-
-                self.logger.info(f"Analyzing file: {file_path}")
-
+            # 使用批量并行分析（如果有Agent编排器）
+            if self.agent_orchestrator:
+                self.logger.info(f"[Batch Analysis] Starting parallel analysis of {total_files} files with orchestrator")
                 try:
-                    # 获取变更的行号
-                    diff_content = change.get('diff', '')
-                    changed_lines = self._extract_changed_lines(diff_content)
+                    analyzed_files, all_issues, issue_records = self._batch_analyze_files(
+                        changes, gitlab_client, project_id, mr_info, user, review_id
+                    )
+                    processed_files = len(analyzed_files)
+                except Exception as e:
+                    self.logger.error(f"Batch analysis failed: {e}, falling back to serial processing")
+                    # 如果批量分析失败，回退到串行处理
+                    processed_files = 0
+                    for change in changes:
+                        # 检查是否被取消
+                        if self._is_review_cancelled(review_id):
+                            self.logger.info(f"Review {review_id} was cancelled, stopping analysis")
+                            self.db.cancel_review_record(review_id, "用户手动取消")
+                            return {
+                                'success': False,
+                                'error': '审查已被用户取消',
+                                'error_code': 'CANCELLED_BY_USER',
+                                'review_id': review_id
+                            }
 
-                    # 添加详细的调试日志
-                    diff_size = len(diff_content)
-                    self.logger.info(f"Processing {file_path}: diff size = {diff_size} bytes, changed lines = {len(changed_lines)}")
+                        if change.get('deleted_file', False):
+                            continue
 
-                    if not changed_lines:
-                        if diff_size > 0:
-                            self.logger.warning(f"File {file_path} has diff content ({diff_size} bytes) but no changed lines found - possible large diff truncation")
-                            # 对于有diff但没有解析到变更行的情况，可能是大文件导致的diff截断
-                            if diff_size > 10000:  # 如果diff超过10KB，可能是大文件问题
+                        file_path = change.get('new_path') or change.get('old_path')
+                        if not file_path:
+                            continue
+
+                        self.logger.info(f"[Fallback Serial] Analyzing file: {file_path}")
+
+                        try:
+                            diff_content = change.get('diff', '')
+                            changed_lines = self._extract_changed_lines(diff_content)
+                            diff_size = len(diff_content)
+
+                            if not changed_lines:
+                                if diff_size > 10000:
+                                    analyzed_files.append({
+                                        'file_path': file_path,
+                                        'issues_count': 0,
+                                        'issues': [],
+                                        'ai_issues': 0,
+                                        'skipped': True,
+                                        'skip_reason': f'文件变更过大 (diff: {diff_size} bytes)，无法解析变更行，已跳过审查'
+                                    })
+                                continue
+
+                            file_content = self._get_full_file_content(gitlab_client, project_id, file_path, mr_info.get('source_branch', 'main'))
+                            if not file_content:
+                                file_content = self._get_file_content_from_diff(change.get('diff', ''))
+                                if not file_content:
+                                    continue
+
+                            self._update_progress(review_id, 'analyzing', processed_files, len(all_issues), file_path)
+
+                            ai_issues = self._analyze_with_single_agent(
+                                file_path, file_content, changed_lines, change.get('diff', ''),
+                                mr_info, user
+                            )
+
+                            analyzed_files.append({
+                                'file_path': file_path,
+                                'issues_count': len(ai_issues),
+                                'issues': ai_issues,
+                                'ai_issues': len(ai_issues)
+                            })
+
+                            if ai_issues:
+                                all_issues.extend(ai_issues)
+                                for issue in ai_issues:
+                                    issue_records.append({'issue': issue, 'file_path': file_path})
+
+                        except Exception as e:
+                            self.logger.warning(f"Failed to analyze file {file_path}: {e}")
+                            continue
+                        finally:
+                            processed_files += 1
+                            self._update_progress(review_id, 'analyzing', processed_files, len(all_issues))
+            else:
+                # 没有编排器，使用串行处理
+                self.logger.info(f"[Serial Analysis] No orchestrator available, using serial processing")
+                processed_files = 0
+                for change in changes:
+                    # 检查是否被取消
+                    if self._is_review_cancelled(review_id):
+                        self.logger.info(f"Review {review_id} was cancelled, stopping analysis")
+                        self.db.cancel_review_record(review_id, "用户手动取消")
+                        return {
+                            'success': False,
+                            'error': '审查已被用户取消',
+                            'error_code': 'CANCELLED_BY_USER',
+                            'review_id': review_id
+                        }
+
+                    if change.get('deleted_file', False):
+                        continue
+
+                    file_path = change.get('new_path') or change.get('old_path')
+                    if not file_path:
+                        continue
+
+                    self.logger.info(f"Analyzing file: {file_path}")
+
+                    try:
+                        diff_content = change.get('diff', '')
+                        changed_lines = self._extract_changed_lines(diff_content)
+                        diff_size = len(diff_content)
+                        self.logger.info(f"Processing {file_path}: diff size = {diff_size} bytes, changed lines = {len(changed_lines)}")
+
+                        if not changed_lines:
+                            if diff_size > 0:
+                                self.logger.warning(f"File {file_path} has diff content ({diff_size} bytes) but no changed lines found - possible large diff truncation")
+                                if diff_size > 10000:
+                                    analyzed_files.append({
+                                        'file_path': file_path,
+                                        'issues_count': 0,
+                                        'issues': [],
+                                        'ai_issues': 0,
+                                        'skipped': True,
+                                        'skip_reason': f'文件变更过大 (diff: {diff_size} bytes)，无法解析变更行，已跳过审查'
+                                    })
+                                    continue
+                            self.logger.info(f"No changed lines found in {file_path}, skipping")
+                            continue
+
+                        file_content = self._get_full_file_content(gitlab_client, project_id, file_path, mr_info.get('source_branch', 'main'))
+                        if not file_content:
+                            self.logger.warning(f"Could not get file content for {file_path}, falling back to diff content")
+                            file_content = self._get_file_content_from_diff(change.get('diff', ''))
+                            if not file_content:
+                                continue
+
+                        self._update_progress(review_id, 'analyzing', processed_files, len(all_issues), file_path)
+
+                        ai_issues = []
+                        try:
+                            ai_issues = self._analyze_with_single_agent(
+                                file_path, file_content, changed_lines, change.get('diff', ''),
+                                mr_info, user
+                            )
+
+                            if ai_issues:
+                                self.logger.info(f"Agent analysis found {len(ai_issues)} issues in {file_path}")
+
+                            analyzed_files.append({
+                                'file_path': file_path,
+                                'issues_count': len(ai_issues),
+                                'issues': ai_issues,
+                                'ai_issues': len(ai_issues)
+                            })
+
+                            if ai_issues:
+                                all_issues.extend(ai_issues)
+                                for issue in ai_issues:
+                                    issue_records.append({'issue': issue, 'file_path': file_path})
+                                self.logger.info(f"Found {len(ai_issues)} AI issues in {file_path}")
+                            else:
+                                self.logger.info(f"No issues found in {file_path}")
+
+                        except Exception as e:
+                            error_message = str(e)
+                            if "文件过大警告" in error_message or "超过AI模型token限制" in error_message:
+                                self.logger.warning(f"Skipping large file {file_path}: {e}")
                                 analyzed_files.append({
                                     'file_path': file_path,
                                     'issues_count': 0,
                                     'issues': [],
                                     'ai_issues': 0,
                                     'skipped': True,
-                                    'skip_reason': f'文件变更过大 (diff: {diff_size} bytes)，无法解析变更行，已跳过审查'
+                                    'skip_reason': error_message
                                 })
                                 continue
-                        self.logger.info(f"No changed lines found in {file_path}, skipping")
-                        continue
-
-                    # 获取完整的源文件内容
-                    file_content = self._get_full_file_content(gitlab_client, project_id, file_path, mr_info.get('source_branch', 'main'))
-                    if not file_content:
-                        self.logger.warning(f"Could not get file content for {file_path}, falling back to diff content")
-                        file_content = self._get_file_content_from_diff(change.get('diff', ''))
-                        if not file_content:
-                            continue
-
-                    # 更新进度 - 显示当前分析的文件
-                    self._update_progress(review_id, 'analyzing', processed_files, len(all_issues), file_path)
-
-                    # AI Agent分析 - 使用编排系统或回退到单Agent
-                    ai_issues = []
-                    try:
-                        if self.agent_orchestrator:
-                            # 使用Agent编排系统进行分析
-                            ai_issues = self._analyze_with_orchestrator(
-                                file_path, file_content, changed_lines, change.get('diff', ''),
-                                mr_info, user, review_id
-                            )
-                        else:
-                            # 回退到单Agent模式
-                            ai_issues = self._analyze_with_single_agent(
-                                file_path, file_content, changed_lines, change.get('diff', ''),
-                                mr_info, user
-                            )
-
-                        # 记录分析结果
-                        if ai_issues:
-                            self.logger.info(f"Agent analysis found {len(ai_issues)} issues in {file_path}")
-
-                        # 添加到分析文件列表（无论是否有问题都算分析过）
-                        analyzed_files.append({
-                            'file_path': file_path,
-                            'issues_count': len(ai_issues),
-                            'issues': ai_issues,
-                            'ai_issues': len(ai_issues)
-                        })
-
-                        if ai_issues:
-                            all_issues.extend(ai_issues)
-
-                            # 将问题保存到issue_records列表，稍后统一处理
-                            for issue in ai_issues:
-                                issue_records.append({'issue': issue, 'file_path': file_path})
-
-                            self.logger.info(f"Found {len(ai_issues)} AI issues in {file_path}")
-                        else:
-                            self.logger.info(f"No issues found in {file_path}")
+                            else:
+                                self.logger.error(f"AI analysis failed for {file_path}: {e}")
+                                error_msg = f'AI代码分析失败: {str(e)}'
+                                if review_id:
+                                    self.db.fail_review_record(review_id, error_msg)
+                                return {
+                                    'success': False,
+                                    'error': error_msg,
+                                    'error_code': 'AI_ANALYSIS_FAILED',
+                                    'review_id': review_id,
+                                    'failed_file': file_path
+                                }
 
                     except Exception as e:
-                        error_message = str(e)
-                        # 检查是否是文件过大的错误
-                        if "文件过大警告" in error_message or "超过AI模型token限制" in error_message:
-                            # 文件过大，记录警告但继续处理其他文件
-                            self.logger.warning(f"Skipping large file {file_path}: {e}")
-                            # 添加到跳过文件列表，但不添加问题
-                            analyzed_files.append({
-                                'file_path': file_path,
-                                'issues_count': 0,
-                                'issues': [],
-                                'ai_issues': 0,
-                                'skipped': True,
-                                'skip_reason': error_message
-                            })
-                            continue
-                        else:
-                            # 其他AI分析错误，终止整个审查流程
-                            self.logger.error(f"AI analysis failed for {file_path}: {e}")
-                            error_msg = f'AI代码分析失败: {str(e)}'
-                            if review_id:
-                                self.db.fail_review_record(review_id, error_msg)
-                            return {
-                                'success': False,
-                                'error': error_msg,
-                                'error_code': 'AI_ANALYSIS_FAILED',
-                                'review_id': review_id,
-                                'failed_file': file_path
-                            }
-
-                except Exception as e:
-                    self.logger.warning(f"Failed to analyze file {file_path}: {e}")
-                    continue
-                finally:
-                    # 无论成功还是失败都增加处理计数
-                    processed_files += 1
-                    # 更新进度 - 文件处理完成后（不显示当前文件名）
-                    self._update_progress(review_id, 'analyzing', processed_files, len(all_issues))
+                        self.logger.warning(f"Failed to analyze file {file_path}: {e}")
+                        continue
+                    finally:
+                        processed_files += 1
+                        self._update_progress(review_id, 'analyzing', processed_files, len(all_issues))
 
             # 更新进度 - 开始生成评论
             self._update_progress(review_id, 'generating_comments', processed_files, len(all_issues))
@@ -1410,3 +1468,109 @@ class ReviewService:
         except Exception as e:
             self.logger.error(f"Error calculating review duration: {e}")
             return 0
+
+    def _batch_analyze_files(self, changes: List, gitlab_client, project_id: str,
+                           mr_info: Dict, user, review_id: int) -> tuple:
+        """
+        批量并行分析文件
+
+        Returns:
+            tuple: (analyzed_files, all_issues, issue_records)
+        """
+        analyzed_files = []
+        all_issues = []
+        issue_records = []
+
+        # 阶段1：准备所有文件数据
+        self.logger.info(f"[Batch] Phase 1: Preparing file data for parallel analysis")
+        files_to_analyze = []
+
+        for change in changes:
+            if self._is_review_cancelled(review_id):
+                raise Exception("用户手动取消")
+
+            if change.get('deleted_file', False):
+                continue
+
+            file_path = change.get('new_path') or change.get('old_path')
+            if not file_path:
+                continue
+
+            try:
+                diff_content = change.get('diff', '')
+                changed_lines = self._extract_changed_lines(diff_content)
+                diff_size = len(diff_content)
+
+                if not changed_lines:
+                    if diff_size > 10000:
+                        analyzed_files.append({
+                            'file_path': file_path,
+                            'issues_count': 0,
+                            'issues': [],
+                            'ai_issues': 0,
+                            'skipped': True,
+                            'skip_reason': f'文件变更过大 (diff: {diff_size} bytes)'
+                        })
+                    continue
+
+                file_content = self._get_full_file_content(
+                    gitlab_client, project_id, file_path,
+                    mr_info.get('source_branch', 'main')
+                )
+                if not file_content:
+                    file_content = self._get_file_content_from_diff(diff_content)
+                    if not file_content:
+                        continue
+
+                files_to_analyze.append({
+                    'new_path': file_path,
+                    'file_content': file_content,
+                    'changed_lines': changed_lines,
+                    'diff': diff_content
+                })
+                self.logger.info(f"[Batch] Prepared {file_path}")
+
+            except Exception as e:
+                self.logger.warning(f"[Batch] Failed to prepare {file_path}: {e}")
+                continue
+
+        if not files_to_analyze:
+            self.logger.warning("[Batch] No files to analyze")
+            return analyzed_files, all_issues, issue_records
+
+        # 阶段2：批量并行分析
+        self.logger.info(f"[Batch] Phase 2: Parallel analysis of {len(files_to_analyze)} files")
+        self._update_progress(review_id, 'analyzing', 0, 0,
+                            f"并行分析{len(files_to_analyze)}个文件...")
+
+        try:
+            orchestration_result = self.agent_orchestrator.process_mr_review(
+                files_to_analyze, mr_info, user.ai_config
+            )
+
+            if orchestration_result.success:
+                self.logger.info(f"[Batch] Parallel analysis complete: {orchestration_result.total_issues_found} issues")
+
+                for file_result in orchestration_result.file_results:
+                    file_path = file_result['file_path']
+                    ai_issues = file_result['issues']
+
+                    analyzed_files.append({
+                        'file_path': file_path,
+                        'issues_count': len(ai_issues),
+                        'issues': ai_issues,
+                        'ai_issues': len(ai_issues)
+                    })
+
+                    if ai_issues:
+                        all_issues.extend(ai_issues)
+                        for issue in ai_issues:
+                            issue_records.append({'issue': issue, 'file_path': file_path})
+            else:
+                raise Exception(f"批量分析失败: {orchestration_result.error}")
+
+        except Exception as e:
+            self.logger.error(f"[Batch] Analysis failed: {e}")
+            raise
+
+        return analyzed_files, all_issues, issue_records
