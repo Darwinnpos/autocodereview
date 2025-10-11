@@ -217,27 +217,33 @@ def update_profile():
 
         if 'gitlab_url' in data:
             gitlab_url = data['gitlab_url'].strip()
-            update_fields['gitlab_url'] = gitlab_url if gitlab_url else None
+            if gitlab_url:  # 只在有值时更新
+                update_fields['gitlab_url'] = gitlab_url
 
         if 'access_token' in data:
             access_token = data['access_token'].strip()
-            update_fields['access_token'] = access_token if access_token else None
+            if access_token:  # 只在有值时更新
+                update_fields['access_token'] = access_token
 
         if 'reviewer_name' in data:
             reviewer_name = data['reviewer_name'].strip()
-            update_fields['reviewer_name'] = reviewer_name
+            if reviewer_name:  # 只在有值时更新
+                update_fields['reviewer_name'] = reviewer_name
 
         if 'ai_api_url' in data:
             ai_api_url = data['ai_api_url'].strip()
-            update_fields['ai_api_url'] = ai_api_url if ai_api_url else None
+            if ai_api_url:  # 只在有值时更新
+                update_fields['ai_api_url'] = ai_api_url
 
         if 'ai_api_key' in data:
             ai_api_key = data['ai_api_key'].strip()
-            update_fields['ai_api_key'] = ai_api_key if ai_api_key else None
+            if ai_api_key:  # 只在有值时更新
+                update_fields['ai_api_key'] = ai_api_key
 
         if 'ai_model' in data:
             ai_model = data['ai_model'].strip()
-            update_fields['ai_model'] = ai_model if ai_model else None
+            if ai_model:  # 只在有值时更新
+                update_fields['ai_model'] = ai_model
 
         if 'review_config' in data:
             update_fields['review_config'] = data['review_config']
