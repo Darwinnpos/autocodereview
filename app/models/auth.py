@@ -43,7 +43,7 @@ class User:
 class AuthDatabase:
     """用户认证数据库管理"""
 
-    def __init__(self, db_path: str = "auth.db"):
+    def __init__(self, db_path: str = "temp/auth.db"):
         self.db_path = db_path
         self.init_database()
 

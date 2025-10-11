@@ -5,7 +5,7 @@ import os
 class DefaultConfig:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'autocodereview-secret-key-2025'
     DEBUG = False
-    DATABASE_PATH = os.environ.get('DATABASE_PATH') or 'reviews.db'
+    DATABASE_PATH = os.environ.get('DATABASE_PATH') or 'temp/reviews.db'
     USER_CONFIG_DIR = os.environ.get('USER_CONFIG_DIR') or 'user_configs'
     LOG_LEVEL = 'INFO'
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max file upload

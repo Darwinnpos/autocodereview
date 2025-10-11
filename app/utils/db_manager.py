@@ -228,7 +228,7 @@ def get_auth_db_manager() -> DatabaseConnectionManager:
     """获取认证数据库连接管理器"""
     global _auth_db_manager
     if _auth_db_manager is None:
-        _auth_db_manager = DatabaseConnectionManager('auth.db')
+        _auth_db_manager = DatabaseConnectionManager('temp/auth.db')
     return _auth_db_manager
 
 
@@ -236,7 +236,7 @@ def get_review_db_manager() -> DatabaseConnectionManager:
     """获取审查数据库连接管理器"""
     global _review_db_manager
     if _review_db_manager is None:
-        _review_db_manager = DatabaseConnectionManager('reviews.db')
+        _review_db_manager = DatabaseConnectionManager('temp/reviews.db')
     return _review_db_manager
 
 
