@@ -6,7 +6,7 @@ from datetime import datetime
 
 
 class ReviewDatabase:
-    def __init__(self, db_path: str = "reviews.db"):
+    def __init__(self, db_path: str = "temp/reviews.db"):
         self.db_path = db_path
         self.init_database()
 
