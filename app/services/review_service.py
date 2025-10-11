@@ -26,7 +26,7 @@ from flask import current_app
 
 
 class ReviewService:
-    def __init__(self, config_manager=None, db_path: str = "reviews.db"):
+    def __init__(self, config_manager=None, db_path: str = "temp/reviews.db"):
         # config_manager参数已废弃，保留用于向后兼容
         self.db = ReviewDatabase(db_path)
         self.auth_db = AuthDatabase()
