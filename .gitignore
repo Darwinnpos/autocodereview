@@ -59,6 +59,9 @@ Thumbs.db
 # Application specific
 cookies.txt
 
+# Temporary data directory
+temp/
+
 # Archive files (usually not needed in git)
 *.zip
 *.tar.gz
