@@ -3,9 +3,12 @@ import os
 import sqlite3
 import hashlib
 import secrets
+import logging
 from typing import Dict, List, Optional
 from datetime import datetime, timedelta
 from dataclasses import dataclass
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -152,6 +155,12 @@ class AuthDatabase:
         cursor = conn.cursor()
 
         try:
+            # 为 NOT NULL 字段提供默认值
+            if gitlab_url is None:
+                gitlab_url = ""
+            if access_token is None:
+                access_token = ""
+
             password_hash = self._hash_password(password)
             cursor.execute('''
                 INSERT INTO users (
@@ -168,7 +177,9 @@ class AuthDatabase:
             conn.commit()
             return user_id
 
-        except sqlite3.IntegrityError:
+        except sqlite3.IntegrityError as e:
+            # 记录详细错误信息以便调试
+            logger.error(f"Failed to create user {username}: {e}")
             return None
         finally:
             conn.close()
