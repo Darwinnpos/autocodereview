@@ -27,6 +27,7 @@ class User:
     ai_model: str
     review_config: str
     review_severity_level: str  # 'strict', 'standard', 'relaxed'
+    review_mode: str  # 'parallel', 'serial'
     is_active: bool
     created_at: str
     last_login: str
@@ -76,6 +77,7 @@ class AuthDatabase:
                 ai_model TEXT NOT NULL DEFAULT 'gpt-3.5-turbo',
                 review_config TEXT,
                 review_severity_level TEXT NOT NULL DEFAULT 'standard',
+                review_mode TEXT NOT NULL DEFAULT 'serial',
                 is_active BOOLEAN DEFAULT 1,
                 created_at TEXT NOT NULL,
                 last_login TEXT,
@@ -102,6 +104,8 @@ class AuthDatabase:
             cursor.execute('ALTER TABLE users ADD COLUMN review_config TEXT')
         if 'review_severity_level' not in columns:
             cursor.execute("ALTER TABLE users ADD COLUMN review_severity_level TEXT NOT NULL DEFAULT 'standard'")
+        if 'review_mode' not in columns:
+            cursor.execute("ALTER TABLE users ADD COLUMN review_mode TEXT NOT NULL DEFAULT 'serial'")
 
         # 创建索引
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_users_username ON users (username)')
@@ -307,7 +311,7 @@ class AuthDatabase:
 
     def update_user_config(self, user_id: int, gitlab_url: str, access_token: str, reviewer_name: str,
                           ai_api_url: str = None, ai_api_key: str = None, ai_model: str = None,
-                          review_config: str = None, review_severity_level: str = None) -> bool:
+                          review_config: str = None, review_severity_level: str = None, review_mode: str = None) -> bool:
         """更新用户配置"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -335,6 +339,10 @@ class AuthDatabase:
         if review_severity_level is not None:
             update_fields.append('review_severity_level = ?')
             update_values.append(review_severity_level)
+
+        if review_mode is not None:
+            update_fields.append('review_mode = ?')
+            update_values.append(review_mode)
 
         update_values.append(user_id)
 

@@ -191,6 +191,7 @@ def get_profile():
                 'ai_model': user.ai_model,
                 'review_config': user.review_config,
                 'review_severity_level': user.review_severity_level,
+                'review_mode': user.review_mode,
                 'created_at': user.created_at,
                 'last_login': user.last_login,
                 'login_count': user.login_count
@@ -254,6 +255,13 @@ def update_profile():
                 update_fields['review_severity_level'] = severity_level
             else:
                 return jsonify({'error': '无效的严重程度等级'}), 400
+
+        if 'review_mode' in data:
+            review_mode = data['review_mode'].strip()
+            if review_mode in ['serial', 'parallel']:
+                update_fields['review_mode'] = review_mode
+            else:
+                return jsonify({'error': '无效的审查模式'}), 400
 
         # 如果提供了GitLab配置，验证连接
         if 'gitlab_url' in update_fields and 'access_token' in update_fields:

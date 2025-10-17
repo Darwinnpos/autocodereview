@@ -390,17 +390,24 @@ class ReviewService:
             # 额外的日志用于调试
             self.logger.info(f"Progress initialized immediately for review {review_id} with {total_files} files")
 
-            # 使用批量并行分析（如果有Agent编排器）
-            if self.agent_orchestrator:
-                self.logger.info(f"[Batch Analysis] Starting parallel analysis of {total_files} files with orchestrator")
+            # 根据用户配置选择审查模式
+            # 检查用户是否启用并行模式，并且Agent编排器可用
+            use_parallel = (
+                hasattr(user, 'review_mode') and
+                user.review_mode == 'parallel' and
+                self.agent_orchestrator is not None
+            )
+
+            if use_parallel:
+                self.logger.info(f"[Batch Analysis] User enabled parallel mode, starting parallel analysis of {total_files} files")
                 try:
                     analyzed_files, all_issues, issue_records = self._batch_analyze_files(
                         changes, gitlab_client, project_id, mr_info, user, review_id
                     )
                     processed_files = len(analyzed_files)
                 except Exception as e:
-                    self.logger.error(f"Batch analysis failed: {e}, falling back to serial processing")
-                    # 如果批量分析失败，回退到串行处理
+                    self.logger.error(f"Parallel analysis failed: {e}, falling back to serial processing")
+                    # 如果并行分析失败，回退到串行处理
                     processed_files = 0
                     for change in changes:
                         # 检查是否被取消
@@ -472,8 +479,9 @@ class ReviewService:
                             processed_files += 1
                             self._update_progress(review_id, 'analyzing', processed_files, len(all_issues))
             else:
-                # 没有编排器，使用串行处理
-                self.logger.info(f"[Serial Analysis] No orchestrator available, using serial processing")
+                # 使用串行处理
+                mode_reason = "user preference" if hasattr(user, 'review_mode') and user.review_mode == 'serial' else "no orchestrator available"
+                self.logger.info(f"[Serial Analysis] Using serial processing ({mode_reason})")
                 processed_files = 0
                 for change in changes:
                     # 检查是否被取消

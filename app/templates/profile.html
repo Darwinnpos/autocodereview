@@ -193,6 +193,49 @@
                                 </div>
                             </div>
 
+                            <!-- 审查执行模式 -->
+                            <div class="mb-4">
+                                <h6 class="mb-3">
+                                    <i class="bi bi-lightning-charge"></i>
+                                    审查执行模式
+                                </h6>
+                                <p class="text-muted small mb-3">选择代码审查的执行方式，影响审查速度和资源使用</p>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="card border-info h-100">
+                                            <div class="card-body text-center p-3">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="radio" name="reviewMode" id="serialMode" value="serial" checked>
+                                                    <label class="form-check-label" for="serialMode">
+                                                        <strong>串行模式</strong> <span class="badge bg-info small">默认</span>
+                                                    </label>
+                                                </div>
+                                                <small class="text-muted d-block mt-2">
+                                                    逐个文件依次审查<br>
+                                                    资源占用低，适合稳定场景
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="card border-primary h-100">
+                                            <div class="card-body text-center p-3">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="radio" name="reviewMode" id="parallelMode" value="parallel">
+                                                    <label class="form-check-label" for="parallelMode">
+                                                        <strong>并行模式</strong> <span class="badge bg-warning small">实验性</span>
+                                                    </label>
+                                                </div>
+                                                <small class="text-muted d-block mt-2">
+                                                    多个文件同时审查<br>
+                                                    速度更快，资源占用较高
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
                             <!-- 详细检查选项 -->
                             <div class="mb-4">
                                 <h6 class="mb-3">
@@ -461,6 +504,13 @@ function populateProfile(user) {
         severityRadio.checked = true;
     }
 
+    // 设置审查模式
+    const reviewMode = user.review_mode || 'serial';
+    const modeRadio = document.querySelector(`input[name="reviewMode"][value="${reviewMode}"]`);
+    if (modeRadio) {
+        modeRadio.checked = true;
+    }
+
     if (user.review_config) {
         try {
             const reviewConfig = typeof user.review_config === 'string'
@@ -638,10 +688,15 @@ document.getElementById('reviewForm').addEventListener('submit', async function(
         const selectedSeverity = document.querySelector('input[name="reviewSeverityLevel"]:checked');
         const severityLevel = selectedSeverity ? selectedSeverity.value : 'standard';
 
-        // 审查配置表单提交审查配置和严重程度等级
+        // 获取审查模式
+        const selectedMode = document.querySelector('input[name="reviewMode"]:checked');
+        const reviewMode = selectedMode ? selectedMode.value : 'serial';
+
+        // 审查配置表单提交审查配置、严重程度等级和审查模式
         const formData = {
             review_config: JSON.stringify(reviewConfig),
-            review_severity_level: severityLevel
+            review_severity_level: severityLevel,
+            review_mode: reviewMode
         };
 
         const response = await axios.put('/api/profile', formData);
