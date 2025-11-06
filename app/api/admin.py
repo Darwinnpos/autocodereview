@@ -4,6 +4,9 @@ from app.models.review import ReviewDatabase
 from app.models.auth import AuthDatabase
 from datetime import datetime, timedelta
 import sqlite3
+import logging
+
+logger = logging.getLogger(__name__)
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -14,20 +17,20 @@ auth_db = AuthDatabase()
 
 def require_admin():
     """检查用户是否为管理员"""
-    print(f"Debug - session内容: {dict(session)}")
+    logger.debug(f"Session content: {dict(session)}")
     if 'user_id' not in session:
-        print("Debug - session中没有user_id")
+        logger.debug("No user_id in session")
         return False, None
 
     user_id = session['user_id']
-    print(f"Debug - 用户ID: {user_id}")
+    logger.debug(f"User ID: {user_id}")
     user = auth_db.get_user_by_id(user_id)
-    print(f"Debug - 用户信息: {user}")
+    logger.debug(f"User info: {user}")
     if not user or user.role != 'admin':
-        print(f"Debug - 用户不存在或不是管理员, role: {user.role if user else 'None'}")
+        logger.debug(f"User does not exist or is not admin, role: {user.role if user else 'None'}")
         return False, None
 
-    print(f"Debug - 管理员验证成功: {user.username}")
+    logger.debug(f"Admin verification successful: {user.username}")
     return True, user
 
 

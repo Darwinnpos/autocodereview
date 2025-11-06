@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from flask import Blueprint, request, jsonify, session, current_app
+from flask_wtf.csrf import generate_csrf
 from typing import Dict, Any
 import logging
 import re
@@ -27,6 +28,20 @@ def validate_password(password: str) -> tuple[bool, str]:
     if len(password) > 128:
         return False, "密码不能超过128位"
     return True, ""
+
+
+@bp.route('/csrf-token', methods=['GET'])
+def get_csrf_token():
+    """获取CSRF token（用于前端AJAX请求）"""
+    try:
+        token = generate_csrf()
+        return jsonify({
+            'success': True,
+            'csrf_token': token
+        }), 200
+    except Exception as e:
+        logger.error(f"Error generating CSRF token: {e}")
+        return jsonify({'error': 'Failed to generate CSRF token'}), 500
 
 
 def test_gitlab_connection(gitlab_url: str, access_token: str) -> tuple[bool, str]:
@@ -116,13 +131,23 @@ def login():
         if not user:
             return jsonify({'error': '用户名或密码错误'}), 401
 
-        # 创建会话
+        # 防止会话固定攻击：清除旧的session，强制生成新的session ID
+        old_session_token = session.get('session_token')
+        if old_session_token:
+            # 使旧的session token失效
+            auth_db.invalidate_session(old_session_token)
+
+        # 清空旧session（Flask会生成新的session ID）
+        session.clear()
+
+        # 创建新的数据库会话
         session_token = auth_db.create_session(user.id)
 
-        # 设置session
+        # 设置新的session数据
         session['user_id'] = user.id
         session['session_token'] = session_token
         session['role'] = user.role
+        session.modified = True  # 确保Flask知道session已修改
 
         logger.info(f"User logged in: {username} (ID: {user.id})")
 
@@ -573,4 +598,108 @@ def get_admin_review_statistics():
 
     except Exception as e:
         logger.error(f"Error in get_admin_review_statistics: {e}")
+        return jsonify({'error': '服务器内部错误'}), 500
+
+
+@bp.route('/system-status', methods=['GET'])
+def system_status():
+    """检查系统初始化状态"""
+    try:
+        # 检查是否存在管理员用户
+        import sqlite3
+        conn = sqlite3.connect(auth_db.db_path)
+        cursor = conn.cursor()
+        cursor.execute('SELECT COUNT(*) FROM users WHERE role = "admin"')
+        admin_count = cursor.fetchone()[0]
+        conn.close()
+
+        return jsonify({
+            'success': True,
+            'initialized': admin_count > 0,
+            'needs_setup': admin_count == 0
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Error in system_status: {e}")
+        return jsonify({'error': '服务器内部错误'}), 500
+
+
+@bp.route('/initial-setup', methods=['POST'])
+@rate_limit('default', tokens=5)  # 首次设置消费5个令牌
+def initial_setup():
+    """首次设置管理员账户（仅在没有管理员时可用）"""
+    try:
+        # 检查是否已有管理员
+        import sqlite3
+        conn = sqlite3.connect(auth_db.db_path)
+        cursor = conn.cursor()
+        cursor.execute('SELECT COUNT(*) FROM users WHERE role = "admin"')
+        admin_count = cursor.fetchone()[0]
+
+        if admin_count > 0:
+            conn.close()
+            return jsonify({'error': '系统已初始化，无法重复设置'}), 403
+
+        # 获取请求数据
+        data = request.get_json()
+        required_fields = ['username', 'email', 'password']
+        for field in required_fields:
+            if not data.get(field):
+                conn.close()
+                return jsonify({'error': f'缺少必填字段: {field}'}), 400
+
+        username = data['username'].strip()
+        email = data['email'].strip().lower()
+        password = data['password']
+
+        # 验证用户名
+        if len(username) < 3 or len(username) > 50:
+            conn.close()
+            return jsonify({'error': '用户名长度必须在3-50字符之间'}), 400
+
+        if not re.match(r'^[a-zA-Z0-9_-]+$', username):
+            conn.close()
+            return jsonify({'error': '用户名只能包含字母、数字、下划线和横线'}), 400
+
+        # 验证邮箱
+        if not validate_email(email):
+            conn.close()
+            return jsonify({'error': '邮箱格式不正确'}), 400
+
+        # 验证密码
+        is_valid, error_msg = validate_password(password)
+        if not is_valid:
+            conn.close()
+            return jsonify({'error': error_msg}), 400
+
+        # 创建管理员用户
+        from datetime import datetime
+        password_hash = auth_db._hash_password(password)
+
+        cursor.execute('''
+            INSERT INTO users (
+                username, email, password_hash, role, gitlab_url,
+                access_token, reviewer_name, ai_api_url, ai_api_key, ai_model, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            username, email, password_hash, 'admin',
+            'https://gitlab.com', '', 'AdminReviewer',
+            'https://api.openai.com/v1', '', 'gpt-3.5-turbo',
+            datetime.now().isoformat()
+        ))
+
+        user_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+
+        logger.info(f"Initial admin user created: {username} (ID: {user_id})")
+
+        return jsonify({
+            'success': True,
+            'message': '管理员账户创建成功',
+            'user_id': user_id
+        }), 201
+
+    except Exception as e:
+        logger.error(f"Error in initial_setup: {e}")
         return jsonify({'error': '服务器内部错误'}), 500

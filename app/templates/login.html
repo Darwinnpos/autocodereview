@@ -56,6 +56,27 @@
 
 {% block scripts %}
 <script>
+// 登录页面是公开页面，立即显示
+document.body.classList.add('auth-checked');
+
+// 页面加载时检查系统是否已初始化
+async function checkSystemStatus() {
+    try {
+        const response = await fetch('/api/auth/system-status');
+        const data = await response.json();
+
+        if (data.needs_setup) {
+            // 系统未初始化，跳转到设置页面
+            window.location.href = '/setup';
+        }
+    } catch (error) {
+        console.error('检查系统状态失败:', error);
+    }
+}
+
+// 在DOM加载完成后检查
+checkSystemStatus();
+
 document.getElementById('loginForm').addEventListener('submit', async function(e) {
     e.preventDefault();
 
@@ -78,7 +99,16 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
 
             // 延迟跳转，让用户看到成功消息
             setTimeout(() => {
-                window.location.href = '/';
+                // 检查是否有返回URL参数
+                const urlParams = new URLSearchParams(window.location.search);
+                const returnUrl = urlParams.get('return');
+
+                // 跳转到返回URL或默认首页
+                if (returnUrl) {
+                    window.location.href = decodeURIComponent(returnUrl);
+                } else {
+                    window.location.href = '/';
+                }
             }, 1000);
         } else {
             throw new Error(response.data.error || '登录失败');

@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
 import re
 import requests
+import logging
 from typing import Dict, List, Optional, Tuple
+
+logger = logging.getLogger(__name__)
 
 
 class GitLabClient:
@@ -61,8 +64,8 @@ class GitLabClient:
     def get_mr_changes(self, project_id: str, mr_iid: int) -> List[Dict]:
         """获取MR的文件变更"""
         url = f"{self.gitlab_url}/api/v4/projects/{project_id}/merge_requests/{mr_iid}/changes"
-        print(f"DEBUG: Requesting MR changes from URL: {url}")
-        print(f"DEBUG: Headers: {self.headers}")
+        logger.debug(f"Requesting MR changes from URL: {url}")
+        logger.debug(f"Headers: {self.headers}")
 
         # 添加参数以获取完整的diff信息
         params = {
@@ -70,27 +73,27 @@ class GitLabClient:
         }
 
         response = requests.get(url, headers=self.headers, params=params)
-        print(f"DEBUG: Response status: {response.status_code}")
+        logger.debug(f"Response status: {response.status_code}")
 
         if response.status_code != 200:
-            print(f"DEBUG: Response content: {response.text}")
+            logger.debug(f"Response content: {response.text}")
             raise Exception(f"Failed to get MR changes (status {response.status_code}): {response.text}")
 
         response_data = response.json()
         changes = response_data.get('changes', [])
-        print(f"DEBUG: Found {len(changes)} changes in MR")
+        logger.debug(f"Found {len(changes)} changes in MR")
 
         # 添加详细的diff调试信息
         for i, change in enumerate(changes):
             file_path = change.get('new_path') or change.get('old_path', 'unknown')
             diff_content = change.get('diff', '')
-            print(f"DEBUG: Change {i}: file={file_path}, diff_size={len(diff_content)} bytes")
+            logger.debug(f"Change {i}: file={file_path}, diff_size={len(diff_content)} bytes")
             if len(diff_content) == 0:
-                print(f"DEBUG: No diff content for {file_path}")
+                logger.debug(f"No diff content for {file_path}")
             else:
                 # 显示diff的前100个字符
                 diff_preview = diff_content[:100].replace('\n', '\\n')
-                print(f"DEBUG: Diff preview for {file_path}: {diff_preview}...")
+                logger.debug(f"Diff preview for {file_path}: {diff_preview}...")
 
         return changes
 
@@ -106,7 +109,7 @@ class GitLabClient:
 
                 commit_sha = mr_info.get('sha') or mr_info.get('source_branch_sha')
                 if not commit_sha:
-                    print(f"DEBUG: Cannot get commit SHA for line comment, falling back to general comment")
+                    logger.debug(f"Cannot get commit SHA for line comment, falling back to general comment")
                     # 如果无法获取commit SHA，添加一般性评论并注明文件和行号
                     comment = f"**{file_path}:{line_number}**\n\n{comment}"
                     url = f"{self.gitlab_url}/api/v4/projects/{project_id}/merge_requests/{mr_iid}/notes"
@@ -130,17 +133,17 @@ class GitLabClient:
                 url = f"{self.gitlab_url}/api/v4/projects/{project_id}/merge_requests/{mr_iid}/notes"
                 data = {'body': comment}
 
-            print(f"DEBUG: Posting comment to URL: {url}")
-            print(f"DEBUG: Comment data: {data}")
+            logger.debug(f"Posting comment to URL: {url}")
+            logger.debug(f"Comment data: {data}")
 
             response = requests.post(url, json=data, headers=self.headers)
-            print(f"DEBUG: Response status: {response.status_code}")
-            print(f"DEBUG: Response content: {response.text}")
+            logger.debug(f"Response status: {response.status_code}")
+            logger.debug(f"Response content: {response.text}")
 
             return response.status_code in [200, 201]
 
         except Exception as e:
-            print(f"DEBUG: Error posting comment: {e}")
+            logger.error(f"Error posting comment: {e}")
             return False
 
     def get_file_content(self, project_id: str, file_path: str, ref: str) -> Optional[str]:
@@ -158,9 +161,9 @@ class GitLabClient:
             if response.status_code == 200:
                 return response.text
             else:
-                print(f"Failed to get file content: {response.status_code} - {response.text}")
+                logger.error(f"Failed to get file content: {response.status_code} - {response.text}")
                 return None
 
         except Exception as e:
-            print(f"Error getting file content: {e}")
+            logger.error(f"Error getting file content: {e}")
             return None

@@ -8,6 +8,14 @@
     <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/bootstrap-icons.css') }}" rel="stylesheet">
     <style>
+        /* 防止未登录闪烁：默认隐藏页面内容 */
+        body {
+            visibility: hidden;
+        }
+        body.auth-checked {
+            visibility: visible;
+        }
+
         .navbar-brand {
             font-weight: bold;
         }
@@ -183,8 +191,24 @@
         </div>
     </footer>
 
+    <!-- 快速显示公开页面：在所有资源加载前执行 -->
+    <script>
+    (function() {
+        const currentPath = window.location.pathname;
+        const publicPages = ['/login', '/register', '/setup', '/guide', '/health'];
+        const isPublicPage = publicPages.some(page => currentPath === page || currentPath.startsWith(page + '/'));
+
+        if (isPublicPage) {
+            // 公开页面立即显示
+            document.body.classList.add('auth-checked');
+        }
+    })();
+    </script>
+
     <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
     <script src="{{ url_for('static', filename='js/axios.min.js') }}"></script>
+    <!-- CSRF保护 - 必须在axios之后加载 -->
+    <script src="{{ url_for('static', filename='js/csrf.js') }}"></script>
     <!-- Chart.js本地版本用于内网环境 -->
     <script src="{{ url_for('static', filename='js/chart.min.js') }}"></script>
 
@@ -205,17 +229,53 @@
     });
 
     async function checkLoginStatus() {
+        const currentPath = window.location.pathname;
+
+        // 不需要登录的公开页面列表
+        const publicPages = [
+            '/login',
+            '/register',
+            '/setup',
+            '/guide',
+            '/health'
+        ];
+
+        // 检查当前路径是否是公开页面
+        const isPublicPage = publicPages.some(page => currentPath === page || currentPath.startsWith(page + '/'));
+
         try {
             const response = await axios.get('/api/check-session');
             if (response.data.authenticated) {
                 currentUser = response.data.user;
                 showLoggedInNav();
+                // 显示页面
+                document.body.classList.add('auth-checked');
             } else {
                 showLoggedOutNav();
+
+                // 如果不是公开页面，立即跳转到登录页
+                if (!isPublicPage) {
+                    const returnUrl = encodeURIComponent(window.location.pathname + window.location.search);
+                    window.location.href = `/login?return=${returnUrl}`;
+                    return; // 不显示页面，直接返回
+                }
+
+                // 公开页面，显示内容
+                document.body.classList.add('auth-checked');
             }
         } catch (error) {
             console.error('检查登录状态失败:', error);
             showLoggedOutNav();
+
+            // 如果不是公开页面，立即跳转到登录页
+            if (!isPublicPage) {
+                const returnUrl = encodeURIComponent(window.location.pathname + window.location.search);
+                window.location.href = `/login?return=${returnUrl}`;
+                return; // 不显示页面，直接返回
+            }
+
+            // 公开页面，显示内容
+            document.body.classList.add('auth-checked');
         }
     }
 

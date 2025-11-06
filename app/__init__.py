@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from flask import Flask, render_template
 from flask_cors import CORS
+from flask_wtf.csrf import CSRFProtect
 import os
 
 
@@ -18,8 +19,23 @@ def create_app(config_name='default'):
         from config.default import DefaultConfig
         app.config.from_object(DefaultConfig)
 
-    # 启用CORS
-    CORS(app)
+    # 启用CORS（需要配置允许credentials）
+    CORS(app, supports_credentials=True)
+
+    # 启用CSRF保护
+    csrf = CSRFProtect(app)
+
+    # CSRF配置：允许通过HTTP头传递token（适合AJAX）
+    app.config['WTF_CSRF_ENABLED'] = True  # ✓ CSRF保护已启用
+    app.config['WTF_CSRF_CHECK_DEFAULT'] = True
+    app.config['WTF_CSRF_TIME_LIMIT'] = None  # token不过期（依赖session过期）
+    # CSRF token将通过cookie传递给前端
+    app.config['WTF_CSRF_METHODS'] = ['POST', 'PUT', 'PATCH', 'DELETE']
+    # 允许通过HTTP头传递token（适合AJAX）
+    app.config['WTF_CSRF_HEADERS'] = ['X-CSRFToken', 'X-CSRF-Token']
+
+    # 将csrf对象保存到app上下文
+    app.csrf = csrf
 
     # 注册蓝图
     from app.api.review import bp as review_bp
@@ -94,6 +110,11 @@ def create_app(config_name='default'):
     @app.route('/')
     def index():
         return render_template('index.html')
+
+    @app.route('/setup')
+    def setup_page():
+        """首次设置向导页面"""
+        return render_template('setup.html')
 
     @app.route('/config')
     def config_page():

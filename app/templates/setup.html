@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>首次设置 - AutoCodeReview</title>
+    <link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/4.6.0/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .setup-container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+        }
+        .setup-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .setup-header h1 {
+            color: #333;
+            font-size: 28px;
+            font-weight: 600;
+        }
+        .setup-header p {
+            color: #666;
+            margin-top: 10px;
+        }
+        .setup-icon {
+            font-size: 60px;
+            margin-bottom: 20px;
+        }
+        .btn-setup {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            padding: 12px;
+            font-size: 16px;
+            font-weight: 500;
+        }
+        .btn-setup:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+        .alert {
+            border-radius: 8px;
+        }
+        .form-control {
+            border-radius: 8px;
+            border: 1px solid #ddd;
+            padding: 12px;
+        }
+        .form-control:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+        }
+        .password-strength {
+            height: 4px;
+            background: #e0e0e0;
+            border-radius: 2px;
+            margin-top: 5px;
+            overflow: hidden;
+        }
+        .password-strength-bar {
+            height: 100%;
+            transition: all 0.3s;
+            width: 0;
+        }
+        .strength-weak { background: #f44336; width: 33%; }
+        .strength-medium { background: #ff9800; width: 66%; }
+        .strength-strong { background: #4caf50; width: 100%; }
+    </style>
+</head>
+<body>
+    <div class="setup-container">
+        <div class="setup-header">
+            <div class="setup-icon">🚀</div>
+            <h1>欢迎使用 AutoCodeReview</h1>
+            <p>首次使用需要创建管理员账户</p>
+        </div>
+
+        <div id="alert-container"></div>
+
+        <form id="setupForm">
+            <div class="form-group">
+                <label for="username">管理员用户名</label>
+                <input type="text" class="form-control" id="username" name="username"
+                       placeholder="请输入用户名（3-50个字符）" required>
+                <small class="form-text text-muted">只能包含字母、数字、下划线和横线</small>
+            </div>
+
+            <div class="form-group">
+                <label for="email">邮箱地址</label>
+                <input type="email" class="form-control" id="email" name="email"
+                       placeholder="admin@example.com" required>
+            </div>
+
+            <div class="form-group">
+                <label for="password">密码</label>
+                <input type="password" class="form-control" id="password" name="password"
+                       placeholder="请输入密码（至少6位）" required>
+                <div class="password-strength">
+                    <div class="password-strength-bar" id="strengthBar"></div>
+                </div>
+                <small class="form-text text-muted" id="strengthText">密码强度：-</small>
+            </div>
+
+            <div class="form-group">
+                <label for="confirmPassword">确认密码</label>
+                <input type="password" class="form-control" id="confirmPassword"
+                       placeholder="请再次输入密码" required>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block btn-setup" id="submitBtn">
+                创建管理员账户
+            </button>
+        </form>
+
+        <div class="text-center mt-3">
+            <small class="text-muted">
+                已有账户？<a href="/login">立即登录</a>
+            </small>
+        </div>
+    </div>
+
+    <script src="https://cdn.bootcdn.net/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/4.6.0/js/bootstrap.bundle.min.js"></script>
+    <!-- CSRF保护脚本 -->
+    <script src="{{ url_for('static', filename='js/csrf.js') }}"></script>
+    <script>
+        // 设置页面是公开页面，立即显示（如果继承了base.html的样式）
+        if (document.body) {
+            document.body.style.visibility = 'visible';
+        }
+
+        // 密码强度检测
+        $('#password').on('input', function() {
+            const password = $(this).val();
+            const strengthBar = $('#strengthBar');
+            const strengthText = $('#strengthText');
+
+            if (password.length === 0) {
+                strengthBar.removeClass('strength-weak strength-medium strength-strong');
+                strengthText.text('密码强度：-');
+                return;
+            }
+
+            let strength = 0;
+            if (password.length >= 6) strength++;
+            if (password.length >= 10) strength++;
+            if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength++;
+            if (/\d/.test(password)) strength++;
+            if (/[^a-zA-Z0-9]/.test(password)) strength++;
+
+            strengthBar.removeClass('strength-weak strength-medium strength-strong');
+            if (strength <= 2) {
+                strengthBar.addClass('strength-weak');
+                strengthText.text('密码强度：弱').css('color', '#f44336');
+            } else if (strength <= 3) {
+                strengthBar.addClass('strength-medium');
+                strengthText.text('密码强度：中等').css('color', '#ff9800');
+            } else {
+                strengthBar.addClass('strength-strong');
+                strengthText.text('密码强度：强').css('color', '#4caf50');
+            }
+        });
+
+        // 表单提交
+        $('#setupForm').on('submit', async function(e) {
+            e.preventDefault();
+
+            const username = $('#username').val().trim();
+            const email = $('#email').val().trim();
+            const password = $('#password').val();
+            const confirmPassword = $('#confirmPassword').val();
+
+            // 验证
+            if (password !== confirmPassword) {
+                showAlert('两次输入的密码不一致', 'danger');
+                return;
+            }
+
+            if (password.length < 6) {
+                showAlert('密码至少需要6位', 'danger');
+                return;
+            }
+
+            // 禁用按钮
+            const submitBtn = $('#submitBtn');
+            submitBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm mr-2"></span>创建中...');
+
+            try {
+                const response = await fetch('/api/auth/initial-setup', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, email, password })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showAlert('管理员账户创建成功！正在跳转到登录页面...', 'success');
+                    setTimeout(() => {
+                        window.location.href = '/login';
+                    }, 2000);
+                } else {
+                    showAlert(data.error || '创建失败，请重试', 'danger');
+                    submitBtn.prop('disabled', false).text('创建管理员账户');
+                }
+            } catch (error) {
+                showAlert('网络错误：' + error.message, 'danger');
+                submitBtn.prop('disabled', false).text('创建管理员账户');
+            }
+        });
+
+        function showAlert(message, type) {
+            const alertHtml = `
+                <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+                    ${message}
+                    <button type="button" class="close" data-dismiss="alert">
+                        <span>&times;</span>
+                    </button>
+                </div>
+            `;
+            $('#alert-container').html(alertHtml);
+        }
+
+        // 页面加载时检查系统状态
+        $(document).ready(async function() {
+            try {
+                const response = await fetch('/api/auth/system-status');
+                const data = await response.json();
+
+                if (data.initialized) {
+                    // 已初始化，跳转到登录页
+                    window.location.href = '/login';
+                }
+            } catch (error) {
+                console.error('检查系统状态失败:', error);
+            }
+        });
+    </script>
+</body>
+</html>
