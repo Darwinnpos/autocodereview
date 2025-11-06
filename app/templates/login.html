@@ -62,7 +62,7 @@ document.body.classList.add('auth-checked');
 // 页面加载时检查系统是否已初始化
 async function checkSystemStatus() {
     try {
-        const response = await fetch('/api/auth/system-status');
+        const response = await fetch('/api/system-status');
         const data = await response.json();
 
         if (data.needs_setup) {

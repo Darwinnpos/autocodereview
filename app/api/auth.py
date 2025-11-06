@@ -607,8 +607,32 @@ def system_status():
     try:
         # 检查是否存在管理员用户
         import sqlite3
+        import os
+
+        # 如果数据库文件不存在，视为未初始化
+        if not os.path.exists(auth_db.db_path):
+            return jsonify({
+                'success': True,
+                'initialized': False,
+                'needs_setup': True
+            }), 200
+
         conn = sqlite3.connect(auth_db.db_path)
         cursor = conn.cursor()
+
+        # 检查users表是否存在
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")
+        table_exists = cursor.fetchone()
+
+        if not table_exists:
+            conn.close()
+            return jsonify({
+                'success': True,
+                'initialized': False,
+                'needs_setup': True
+            }), 200
+
+        # 检查是否有管理员
         cursor.execute('SELECT COUNT(*) FROM users WHERE role = "admin"')
         admin_count = cursor.fetchone()[0]
         conn.close()
@@ -621,7 +645,12 @@ def system_status():
 
     except Exception as e:
         logger.error(f"Error in system_status: {e}")
-        return jsonify({'error': '服务器内部错误'}), 500
+        # 即使出错，也返回需要设置的状态
+        return jsonify({
+            'success': True,
+            'initialized': False,
+            'needs_setup': True
+        }), 200
 
 
 @bp.route('/initial-setup', methods=['POST'])

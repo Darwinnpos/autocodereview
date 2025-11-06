@@ -197,7 +197,7 @@
             submitBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm mr-2"></span>创建中...');
 
             try {
-                const response = await fetch('/api/auth/initial-setup', {
+                const response = await fetch('/api/initial-setup', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -237,7 +237,7 @@
         // 页面加载时检查系统状态
         $(document).ready(async function() {
             try {
-                const response = await fetch('/api/auth/system-status');
+                const response = await fetch('/api/system-status');
                 const data = await response.json();
 
                 if (data.initialized) {
