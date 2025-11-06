@@ -315,8 +315,20 @@
                 const data = await response.json();
 
                 if (data.initialized) {
-                    // 已初始化，跳转到登录页
-                    window.location.href = '/login';
+                    // 系统已初始化，检查用户是否登录
+                    try {
+                        const profileResponse = await fetch('/api/profile');
+                        if (profileResponse.ok) {
+                            // 用户已登录，跳转到首页
+                            window.location.href = '/';
+                        } else {
+                            // 用户未登录，跳转到登录页
+                            window.location.href = '/login';
+                        }
+                    } catch (error) {
+                        // 获取用户信息失败，跳转到登录页
+                        window.location.href = '/login';
+                    }
                 }
             } catch (error) {
                 console.error('检查系统状态失败:', error);
