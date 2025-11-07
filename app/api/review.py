@@ -395,6 +395,32 @@ def reject_comment(review_id: int, issue_id: int):
         return jsonify({'error': '服务器内部错误'}), 500
 
 
+@bp.route('/review/<int:review_id>/update-comment/<int:issue_id>', methods=['PUT'])
+def update_comment(review_id: int, issue_id: int):
+    """更新评论内容"""
+    try:
+        data = request.get_json()
+        message = data.get('message')
+        suggestion = data.get('suggestion')
+
+        if not message:
+            return jsonify({'error': '问题描述不能为空'}), 400
+
+        success = review_service.update_issue(issue_id, message, suggestion)
+
+        if success:
+            return jsonify({
+                'success': True,
+                'message': '评论已更新并重置为待审状态'
+            }), 200
+        else:
+            return jsonify({'error': '更新评论失败'}), 400
+
+    except Exception as e:
+        logger.error(f"Error in update_comment: {e}")
+        return jsonify({'error': '服务器内部错误'}), 500
+
+
 @bp.route('/review/<int:review_id>/bulk-confirm', methods=['POST'])
 def bulk_confirm_comments(review_id: int):
     """批量确认评论"""

@@ -1104,6 +1104,17 @@ class ReviewService:
         """拒绝评论"""
         return self.db.reject_comment(issue_id)
 
+    def update_issue(self, issue_id: int, message: str = None, suggestion: str = None) -> bool:
+        """更新issue内容"""
+        # 根据message和suggestion生成新的comment_text
+        comment_text = None
+        if message is not None:
+            comment_text = f"**问题：** {message}"
+            if suggestion:
+                comment_text += f"\n\n**建议：** {suggestion}"
+
+        return self.db.update_issue(issue_id, message, suggestion, comment_text)
+
     def bulk_confirm_comments(self, review_id: int, issue_ids: List[int]) -> Dict:
         """批量确认评论"""
         try:

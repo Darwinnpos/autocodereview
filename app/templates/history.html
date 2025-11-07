@@ -189,6 +189,39 @@
         </div>
     </div>
 </div>
+
+<!-- 编辑评论模态框 -->
+<div class="modal fade" id="editCommentModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-pencil-square"></i>
+                    编辑评论
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="editIssueMessage" class="form-label">问题描述 <span class="text-danger">*</span></label>
+                    <textarea class="form-control" id="editIssueMessage" rows="4" required></textarea>
+                </div>
+                <div class="mb-3">
+                    <label for="editIssueSuggestion" class="form-label">修改建议</label>
+                    <textarea class="form-control" id="editIssueSuggestion" rows="3"></textarea>
+                </div>
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i>
+                    更新后评论将重置为"待审"状态，需要重新确认才能提交到GitLab
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" id="saveEditCommentBtn">保存并重置为待审</button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -710,6 +743,10 @@ function renderIssueRow(issue, reviewId) {
                         <button class="btn btn-outline-danger" onclick="rejectSingleComment(${reviewId}, ${issue.id}, event)" title="拒绝">
                             <i class="bi bi-x"></i>
                         </button>
+                    ` : issue.comment_status === 'rejected' ? `
+                        <button class="btn btn-outline-warning" onclick="editRejectedComment(${reviewId}, ${issue.id})" title="编辑">
+                            <i class="bi bi-pencil"></i>
+                        </button>
                     ` : ''}
                 </div>
             </td>
@@ -1010,5 +1047,107 @@ async function rejectSingleComment(reviewId, issueId, event) {
         }
     }
 }
+
+// 全局变量存储当前编辑的评论
+let currentEditReviewId = null;
+let currentEditIssueId = null;
+
+// 编辑已拒绝的评论
+async function editRejectedComment(reviewId, issueId) {
+    try {
+        // 获取issue详情
+        const response = await axios.get(`/api/history/review/${reviewId}`);
+        if (!response.data.success) {
+            throw new Error('获取issue详情失败');
+        }
+
+        const issues = response.data.data.issues || [];
+        const issue = issues.find(i => i.id === issueId);
+
+        if (!issue) {
+            throw new Error('未找到对应的issue');
+        }
+
+        // 存储当前编辑的ID
+        currentEditReviewId = reviewId;
+        currentEditIssueId = issueId;
+
+        // 填充表单
+        document.getElementById('editIssueMessage').value = issue.message || '';
+        document.getElementById('editIssueSuggestion').value = issue.suggestion || '';
+
+        // 显示模态框
+        const modal = new bootstrap.Modal(document.getElementById('editCommentModal'));
+        modal.show();
+    } catch (error) {
+        console.error('Failed to load issue for editing:', error);
+        alert('加载评论详情失败：' + (error.response?.data?.error || error.message));
+    }
+}
+
+// 保存编辑后的评论
+async function saveEditedComment() {
+    const message = document.getElementById('editIssueMessage').value.trim();
+    const suggestion = document.getElementById('editIssueSuggestion').value.trim();
+
+    if (!message) {
+        alert('问题描述不能为空');
+        return;
+    }
+
+    // 获取保存按钮
+    const btn = document.getElementById('saveEditCommentBtn');
+    const originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>保存中...';
+
+    try {
+        const response = await axios.put(
+            `/api/review/${currentEditReviewId}/update-comment/${currentEditIssueId}`,
+            {
+                message: message,
+                suggestion: suggestion || null
+            }
+        );
+
+        if (response.data.success) {
+            alert('评论已更新并重置为待审状态');
+
+            // 关闭编辑模态框
+            const editModal = bootstrap.Modal.getInstance(document.getElementById('editCommentModal'));
+            editModal.hide();
+
+            // 重新加载详情
+            const detailResponse = await axios.get(`/api/history/review/${currentEditReviewId}`);
+            if (detailResponse.data.success) {
+                renderReviewDetailModal(detailResponse.data.data);
+            }
+
+            // 刷新历史列表
+            historyManager.loadReviews();
+
+            // 清空当前编辑的ID
+            currentEditReviewId = null;
+            currentEditIssueId = null;
+        } else {
+            throw new Error(response.data.error || '保存失败');
+        }
+    } catch (error) {
+        console.error('Failed to save edited comment:', error);
+        alert('保存评论失败：' + (error.response?.data?.error || error.message));
+    } finally {
+        // 恢复按钮状态
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+    }
+}
+
+// 绑定保存按钮事件
+document.addEventListener('DOMContentLoaded', function() {
+    const saveBtn = document.getElementById('saveEditCommentBtn');
+    if (saveBtn) {
+        saveBtn.addEventListener('click', saveEditedComment);
+    }
+});
 </script>
 {% endblock %}

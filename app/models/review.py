@@ -298,6 +298,45 @@ class ReviewDatabase:
         conn.commit()
         conn.close()
 
+    def update_issue(self, issue_id: int, message: str = None, suggestion: str = None,
+                     comment_text: str = None) -> bool:
+        """更新issue内容"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        updates = []
+        params = []
+
+        if message is not None:
+            updates.append('message = ?')
+            params.append(message)
+
+        if suggestion is not None:
+            updates.append('suggestion = ?')
+            params.append(suggestion)
+
+        if comment_text is not None:
+            updates.append('comment_text = ?')
+            params.append(comment_text)
+
+        if not updates:
+            conn.close()
+            return False
+
+        # 重置为pending状态，允许重新确认
+        updates.append('comment_status = ?')
+        params.append('pending')
+
+        params.append(issue_id)
+
+        sql = f"UPDATE issues SET {', '.join(updates)} WHERE id = ?"
+        cursor.execute(sql, params)
+
+        success = cursor.rowcount > 0
+        conn.commit()
+        conn.close()
+        return success
+
     def get_review_record(self, review_id: int) -> Optional[Dict]:
         """获取审查记录"""
         conn = sqlite3.connect(self.db_path)
