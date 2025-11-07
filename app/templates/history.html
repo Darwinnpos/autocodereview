@@ -699,9 +699,19 @@ function renderIssueRow(issue, reviewId) {
                 <span class="badge bg-${statusColor}">${statusLabel}</span>
             </td>
             <td>
-                <button class="btn btn-sm btn-outline-primary" onclick="showIssueDetail(${reviewId}, ${issue.id})" title="查看详情">
-                    <i class="bi bi-eye"></i>
-                </button>
+                <div class="btn-group btn-group-sm" role="group">
+                    <button class="btn btn-outline-primary" onclick="showIssueDetail(${reviewId}, ${issue.id})" title="查看详情">
+                        <i class="bi bi-eye"></i>
+                    </button>
+                    ${issue.comment_status === 'pending' ? `
+                        <button class="btn btn-outline-success" onclick="confirmSingleComment(${reviewId}, ${issue.id}, event)" title="确认并提交">
+                            <i class="bi bi-check"></i>
+                        </button>
+                        <button class="btn btn-outline-danger" onclick="rejectSingleComment(${reviewId}, ${issue.id}, event)" title="拒绝">
+                            <i class="bi bi-x"></i>
+                        </button>
+                    ` : ''}
+                </div>
             </td>
         </tr>
     `;
@@ -898,6 +908,100 @@ async function confirmAllPending(reviewId, event) {
     } catch (error) {
         console.error('Failed to confirm comments:', error);
         alert('提交评论失败：' + (error.response?.data?.error || error.message));
+
+        // 恢复按钮状态
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+        }
+    }
+}
+
+// 确认单个评论
+async function confirmSingleComment(reviewId, issueId, event) {
+    if (!confirm('确定要确认并提交此评论到GitLab吗？')) {
+        return;
+    }
+
+    // 获取按钮
+    let btn = null;
+    let originalHtml = '';
+    if (event && event.target) {
+        btn = event.target.closest('button');
+        if (btn) {
+            originalHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+        }
+    }
+
+    try {
+        const response = await axios.post(`/api/review/${reviewId}/confirm-comment/${issueId}`);
+
+        if (response.data.success) {
+            alert('评论已确认并提交到GitLab');
+
+            // 重新加载详情
+            const detailResponse = await axios.get(`/api/history/review/${reviewId}`);
+            if (detailResponse.data.success) {
+                renderReviewDetailModal(detailResponse.data.data);
+            }
+
+            // 刷新历史列表
+            historyManager.loadReviews();
+        } else {
+            throw new Error(response.data.error || '确认失败');
+        }
+    } catch (error) {
+        console.error('Failed to confirm comment:', error);
+        alert('确认评论失败：' + (error.response?.data?.error || error.message));
+
+        // 恢复按钮状态
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+        }
+    }
+}
+
+// 拒绝单个评论
+async function rejectSingleComment(reviewId, issueId, event) {
+    if (!confirm('确定要拒绝此评论吗？')) {
+        return;
+    }
+
+    // 获取按钮
+    let btn = null;
+    let originalHtml = '';
+    if (event && event.target) {
+        btn = event.target.closest('button');
+        if (btn) {
+            originalHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+        }
+    }
+
+    try {
+        const response = await axios.post(`/api/review/${reviewId}/reject-comment/${issueId}`);
+
+        if (response.data.success) {
+            alert('评论已拒绝');
+
+            // 重新加载详情
+            const detailResponse = await axios.get(`/api/history/review/${reviewId}`);
+            if (detailResponse.data.success) {
+                renderReviewDetailModal(detailResponse.data.data);
+            }
+
+            // 刷新历史列表
+            historyManager.loadReviews();
+        } else {
+            throw new Error(response.data.error || '拒绝失败');
+        }
+    } catch (error) {
+        console.error('Failed to reject comment:', error);
+        alert('拒绝评论失败：' + (error.response?.data?.error || error.message));
 
         // 恢复按钮状态
         if (btn) {
