@@ -82,6 +82,7 @@ class AuthDatabase:
                 review_mode TEXT NOT NULL DEFAULT 'serial',
                 is_active BOOLEAN DEFAULT 1,
                 created_at TEXT NOT NULL,
+                updated_at TEXT,
                 last_login TEXT,
                 login_count INTEGER DEFAULT 0
             )
@@ -110,6 +111,8 @@ class AuthDatabase:
             cursor.execute("ALTER TABLE users ADD COLUMN review_severity_level TEXT NOT NULL DEFAULT 'standard'")
         if 'review_mode' not in columns:
             cursor.execute("ALTER TABLE users ADD COLUMN review_mode TEXT NOT NULL DEFAULT 'serial'")
+        if 'updated_at' not in columns:
+            cursor.execute('ALTER TABLE users ADD COLUMN updated_at TEXT')
 
         # 创建索引
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_users_username ON users (username)')
