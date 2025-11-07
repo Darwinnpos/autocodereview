@@ -478,7 +478,7 @@ function populateProfile(user) {
 
     // AI模型需要特殊处理，如果有保存的模型，需要将其添加到下拉列表
     const aiModelSelect = document.getElementById('aiModel');
-    if (user.ai_model) {
+    if (user.ai_model && user.ai_model.trim() !== '') {
         // 如果没有现有选项，添加当前保存的模型
         let hasCurrentModel = false;
         for (let i = 0; i < aiModelSelect.options.length; i++) {
@@ -494,6 +494,9 @@ function populateProfile(user) {
             aiModelSelect.appendChild(option);
         }
         aiModelSelect.value = user.ai_model;
+    } else {
+        // ai_model为空时，保持默认的"请先探测可用模型"选项
+        aiModelSelect.value = '';
     }
 
     // 审查配置

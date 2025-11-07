@@ -74,7 +74,7 @@ class AuthDatabase:
                 reviewer_name TEXT NOT NULL DEFAULT 'AutoCodeReview',
                 ai_api_url TEXT NOT NULL DEFAULT 'https://api.openai.com/v1',
                 ai_api_key TEXT NOT NULL DEFAULT '',
-                ai_model TEXT NOT NULL DEFAULT 'gpt-3.5-turbo',
+                ai_model TEXT NOT NULL DEFAULT '',
                 review_config TEXT,
                 review_severity_level TEXT NOT NULL DEFAULT 'standard',
                 review_mode TEXT NOT NULL DEFAULT 'serial',
@@ -133,7 +133,7 @@ class AuthDatabase:
                 ''', (
                     'admin', 'admin@autocodereview.com', admin_password, 'admin',
                     'https://gitlab.com', '', 'AdminReviewer',
-                    'https://api.openai.com/v1', '', 'gpt-3.5-turbo',
+                    'https://api.openai.com/v1', '', '',
                     datetime.now().isoformat()
                 ))
                 logger.info("Initial admin user created successfully")
@@ -161,7 +161,7 @@ class AuthDatabase:
     def create_user(self, username: str, email: str, password: str,
                    gitlab_url: str = None, access_token: str = None, reviewer_name: str = "AutoCodeReview",
                    ai_api_url: str = "https://api.openai.com/v1", ai_api_key: str = "",
-                   ai_model: str = "gpt-3.5-turbo") -> Optional[int]:
+                   ai_model: str = "") -> Optional[int]:
         """创建新用户"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
