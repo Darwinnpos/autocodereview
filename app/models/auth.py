@@ -31,6 +31,7 @@ class User:
     review_mode: str  # 'parallel', 'serial'
     is_active: bool
     created_at: str
+    updated_at: str
     last_login: str
     login_count: int
 
