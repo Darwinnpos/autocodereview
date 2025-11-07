@@ -388,31 +388,62 @@ def update_user_status(target_user_id):
         data = request.get_json()
         action = data.get('action')  # 'activate', 'deactivate', 'make_admin', 'make_user'
 
+        # 检查是否是对自己进行操作
+        target_user = auth_db.get_user_by_id(target_user_id)
+        if not target_user:
+            return jsonify({'error': '用户不存在'}), 404
+
+        is_self_operation = (user_id == target_user_id)
+
         if action == 'activate':
             success = auth_db.activate_user(target_user_id)
         elif action == 'deactivate':
+            # 管理员不能停用自己的账户
+            if is_self_operation and current_user.role == 'admin':
+                return jsonify({'error': '不能停用自己的账户'}), 403
             success = auth_db.deactivate_user(target_user_id)
             if not success:
-                # 检查是否是默认管理员（由数据库层检查）
                 user = auth_db.get_user_by_id(target_user_id)
                 if user and hasattr(user, 'is_default_admin') and user.is_default_admin:
                     return jsonify({'error': '默认管理员账户不能停用'}), 403
+                elif user and user.role == 'admin' and user.is_active:
+                    # 检查是否是最后一个活跃管理员
+                    active_admin_count = auth_db.get_active_admin_count()
+                    if active_admin_count <= 1:
+                        return jsonify({'error': '不能停用最后一个管理员账户'}), 403
+                return jsonify({'error': '停用用户失败'}), 500
         elif action == 'make_admin':
             success = auth_db.change_user_role(target_user_id, 'admin')
         elif action == 'make_user':
+            # 管理员不能将自己降级为普通用户
+            if is_self_operation and current_user.role == 'admin':
+                return jsonify({'error': '不能将自己降级为普通用户'}), 403
             success = auth_db.change_user_role(target_user_id, 'user')
             if not success:
-                # 检查是否是默认管理员（由数据库层检查）
                 user = auth_db.get_user_by_id(target_user_id)
                 if user and hasattr(user, 'is_default_admin') and user.is_default_admin:
                     return jsonify({'error': '默认管理员账户不能降级为普通用户'}), 403
+                elif user and user.role == 'admin' and user.is_active:
+                    # 检查是否是最后一个活跃管理员
+                    active_admin_count = auth_db.get_active_admin_count()
+                    if active_admin_count <= 1:
+                        return jsonify({'error': '不能降级最后一个管理员账户'}), 403
+                return jsonify({'error': '修改用户角色失败'}), 500
         elif action == 'remove':
-            # 由数据库层检查是否是默认管理员
+            # 管理员不能删除自己的账户
+            if is_self_operation and current_user.role == 'admin':
+                return jsonify({'error': '不能删除自己的账户'}), 403
             success = auth_db.remove_user(target_user_id)
             if not success:
                 user = auth_db.get_user_by_id(target_user_id)
                 if user and hasattr(user, 'is_default_admin') and user.is_default_admin:
                     return jsonify({'error': '默认管理员账户不能删除'}), 403
+                elif user and user.role == 'admin' and user.is_active:
+                    # 检查是否是最后一个活跃管理员
+                    active_admin_count = auth_db.get_active_admin_count()
+                    if active_admin_count <= 1:
+                        return jsonify({'error': '不能删除最后一个管理员账户'}), 403
+                return jsonify({'error': '删除用户失败'}), 500
         elif action == 'reset_password':
             # 重置用户密码
             new_password = data.get('new_password', '')

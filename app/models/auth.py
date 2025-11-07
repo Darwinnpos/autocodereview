@@ -453,18 +453,41 @@ class AuthDatabase:
         conn.close()
         return count
 
+    def get_active_admin_count(self) -> int:
+        """获取活跃管理员数量"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute('SELECT COUNT(*) FROM users WHERE role = "admin" AND is_active = 1')
+        count = cursor.fetchone()[0]
+        conn.close()
+        return count
+
     def deactivate_user(self, user_id: int) -> bool:
         """停用用户"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
         # 检查是否是默认管理员
-        cursor.execute('SELECT is_default_admin FROM users WHERE id = ?', (user_id,))
+        cursor.execute('SELECT is_default_admin, role, is_active FROM users WHERE id = ?', (user_id,))
         user_info = cursor.fetchone()
 
-        if user_info and user_info[0] == 1:
+        if not user_info:
+            conn.close()
+            return False
+
+        is_default_admin, role, is_active = user_info
+
+        if is_default_admin == 1:
             conn.close()
             return False  # 不允许停用默认管理员
+
+        # 如果是管理员，检查活跃管理员数量
+        if role == 'admin' and is_active == 1:
+            cursor.execute('SELECT COUNT(*) FROM users WHERE role = "admin" AND is_active = 1')
+            active_admin_count = cursor.fetchone()[0]
+            if active_admin_count <= 1:
+                conn.close()
+                return False  # 不允许停用最后一个管理员
 
         cursor.execute('UPDATE users SET is_active = 0 WHERE id = ?', (user_id,))
 
@@ -496,13 +519,27 @@ class AuthDatabase:
         cursor = conn.cursor()
 
         # 检查是否是默认管理员
-        cursor.execute('SELECT is_default_admin, role FROM users WHERE id = ?', (user_id,))
+        cursor.execute('SELECT is_default_admin, role, is_active FROM users WHERE id = ?', (user_id,))
         user_info = cursor.fetchone()
 
-        if user_info and user_info[0] == 1:
+        if not user_info:
+            conn.close()
+            return False
+
+        is_default_admin, current_role, is_active = user_info
+
+        if is_default_admin == 1:
             if new_role != 'admin':
                 conn.close()
                 return False  # 不允许将默认管理员降级为普通用户
+
+        # 如果要将管理员降级为普通用户，检查活跃管理员数量
+        if current_role == 'admin' and new_role == 'user' and is_active == 1:
+            cursor.execute('SELECT COUNT(*) FROM users WHERE role = "admin" AND is_active = 1')
+            active_admin_count = cursor.fetchone()[0]
+            if active_admin_count <= 1:
+                conn.close()
+                return False  # 不允许降级最后一个管理员
 
         cursor.execute('UPDATE users SET role = ? WHERE id = ?', (new_role, user_id))
 
@@ -518,11 +555,26 @@ class AuthDatabase:
         cursor = conn.cursor()
 
         # 检查是否是默认管理员
-        cursor.execute('SELECT is_default_admin FROM users WHERE id = ?', (user_id,))
+        cursor.execute('SELECT is_default_admin, role, is_active FROM users WHERE id = ?', (user_id,))
         user_info = cursor.fetchone()
-        if user_info and user_info[0] == 1:
+
+        if not user_info:
+            conn.close()
+            return False
+
+        is_default_admin, role, is_active = user_info
+
+        if is_default_admin == 1:
             conn.close()
             return False  # 不允许删除默认管理员
+
+        # 如果是活跃管理员，检查活跃管理员数量
+        if role == 'admin' and is_active == 1:
+            cursor.execute('SELECT COUNT(*) FROM users WHERE role = "admin" AND is_active = 1')
+            active_admin_count = cursor.fetchone()[0]
+            if active_admin_count <= 1:
+                conn.close()
+                return False  # 不允许删除最后一个管理员
 
         # 删除用户记录（硬删除）
         # 注意：这里不会删除审查记录，只删除用户账户
