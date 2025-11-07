@@ -504,34 +504,41 @@ function renderUsersTable() {
             <td>${new Date(user.created_at).toLocaleString('zh-CN')}</td>
             <td>
                 <div class="btn-group" role="group">
-                    ${user.is_active ?
-                        `<button type="button" class="btn btn-outline-danger btn-sm"
-                                 onclick="showUserAction(${user.id}, 'deactivate', '${user.username}')">
-                            停用
-                         </button>` :
-                        `<button type="button" class="btn btn-outline-success btn-sm"
-                                 onclick="showUserAction(${user.id}, 'activate', '${user.username}')">
-                            激活
-                         </button>`
+                    ${user.is_default_admin ?
+                        `<span class="badge bg-primary me-2">默认管理员</span>` :
+                        user.is_active ?
+                            `<button type="button" class="btn btn-outline-danger btn-sm"
+                                     onclick="showUserAction(${user.id}, 'deactivate', '${user.username}')">
+                                停用
+                             </button>` :
+                            `<button type="button" class="btn btn-outline-success btn-sm"
+                                     onclick="showUserAction(${user.id}, 'activate', '${user.username}')">
+                                激活
+                             </button>`
                     }
                     ${user.role === 'user' ?
                         `<button type="button" class="btn btn-outline-warning btn-sm"
                                  onclick="showUserAction(${user.id}, 'make_admin', '${user.username}')">
                             设为管理员
                          </button>` :
-                        `<button type="button" class="btn btn-outline-secondary btn-sm"
-                                 onclick="showUserAction(${user.id}, 'make_user', '${user.username}')">
-                            设为普通用户
-                         </button>`
+                        user.is_default_admin ?
+                            `<span class="text-muted small">受保护</span>` :
+                            `<button type="button" class="btn btn-outline-secondary btn-sm"
+                                     onclick="showUserAction(${user.id}, 'make_user', '${user.username}')">
+                                设为普通用户
+                             </button>`
                     }
                     <button type="button" class="btn btn-outline-info btn-sm"
                              onclick="showPasswordReset(${user.id}, '${user.username}')">
                         重置密码
                     </button>
-                    <button type="button" class="btn btn-outline-danger btn-sm"
-                             onclick="showUserAction(${user.id}, 'remove', '${user.username}')">
-                        移除
-                    </button>
+                    ${!user.is_default_admin ?
+                        `<button type="button" class="btn btn-outline-danger btn-sm"
+                                 onclick="showUserAction(${user.id}, 'remove', '${user.username}')">
+                            移除
+                         </button>` :
+                        ''
+                    }
                 </div>
             </td>
         </tr>

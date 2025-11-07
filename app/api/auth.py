@@ -393,25 +393,26 @@ def update_user_status(target_user_id):
         elif action == 'deactivate':
             success = auth_db.deactivate_user(target_user_id)
             if not success:
-                # 检查是否是默认管理员
+                # 检查是否是默认管理员（由数据库层检查）
                 user = auth_db.get_user_by_id(target_user_id)
-                if user and user.username == 'admin' and user.email == 'admin@autocodereview.com':
-                    return jsonify({'error': '默认管理员账户受保护，不能停用'}), 403
+                if user and hasattr(user, 'is_default_admin') and user.is_default_admin:
+                    return jsonify({'error': '默认管理员账户不能停用'}), 403
         elif action == 'make_admin':
             success = auth_db.change_user_role(target_user_id, 'admin')
         elif action == 'make_user':
             success = auth_db.change_user_role(target_user_id, 'user')
             if not success:
-                # 检查是否是默认管理员
+                # 检查是否是默认管理员（由数据库层检查）
                 user = auth_db.get_user_by_id(target_user_id)
-                if user and user.username == 'admin' and user.email == 'admin@autocodereview.com':
-                    return jsonify({'error': '默认管理员账户受保护，不能降级为普通用户'}), 403
+                if user and hasattr(user, 'is_default_admin') and user.is_default_admin:
+                    return jsonify({'error': '默认管理员账户不能降级为普通用户'}), 403
         elif action == 'remove':
-            # 检查是否是默认管理员
-            user = auth_db.get_user_by_id(target_user_id)
-            if user and user.username == 'admin' and user.email == 'admin@autocodereview.com':
-                return jsonify({'error': '默认管理员账户受保护，不能删除'}), 403
+            # 由数据库层检查是否是默认管理员
             success = auth_db.remove_user(target_user_id)
+            if not success:
+                user = auth_db.get_user_by_id(target_user_id)
+                if user and hasattr(user, 'is_default_admin') and user.is_default_admin:
+                    return jsonify({'error': '默认管理员账户不能删除'}), 403
         elif action == 'reset_password':
             # 重置用户密码
             new_password = data.get('new_password', '')

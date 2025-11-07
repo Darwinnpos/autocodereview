@@ -19,6 +19,7 @@ class User:
     email: str
     password_hash: str
     role: str  # 'user' or 'admin'
+    is_default_admin: bool  # 默认管理员不可降级、停用或删除
     gitlab_url: str
     access_token: str
     reviewer_name: str
@@ -69,6 +70,7 @@ class AuthDatabase:
                 email TEXT UNIQUE NOT NULL,
                 password_hash TEXT NOT NULL,
                 role TEXT NOT NULL DEFAULT 'user',
+                is_default_admin BOOLEAN DEFAULT 0,
                 gitlab_url TEXT NOT NULL,
                 access_token TEXT NOT NULL,
                 reviewer_name TEXT NOT NULL DEFAULT 'AutoCodeReview',
@@ -100,6 +102,8 @@ class AuthDatabase:
         # 添加新字段（如果不存在）
         cursor.execute("PRAGMA table_info(users)")
         columns = [column[1] for column in cursor.fetchall()]
+        if 'is_default_admin' not in columns:
+            cursor.execute('ALTER TABLE users ADD COLUMN is_default_admin BOOLEAN DEFAULT 0')
         if 'review_config' not in columns:
             cursor.execute('ALTER TABLE users ADD COLUMN review_config TEXT')
         if 'review_severity_level' not in columns:
@@ -127,11 +131,11 @@ class AuthDatabase:
                 admin_password = self._hash_password(initial_admin_password)
                 cursor.execute('''
                     INSERT INTO users (
-                        username, email, password_hash, role, gitlab_url,
+                        username, email, password_hash, role, is_default_admin, gitlab_url,
                         access_token, reviewer_name, ai_api_url, ai_api_key, ai_model, created_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (
-                    'admin', 'admin@autocodereview.com', admin_password, 'admin',
+                    'admin', 'admin@autocodereview.com', admin_password, 'admin', 1,
                     'https://gitlab.com', '', 'AdminReviewer',
                     'https://api.openai.com/v1', '', '',
                     datetime.now().isoformat()
@@ -161,7 +165,7 @@ class AuthDatabase:
     def create_user(self, username: str, email: str, password: str,
                    gitlab_url: str = None, access_token: str = None, reviewer_name: str = "AutoCodeReview",
                    ai_api_url: str = "https://api.openai.com/v1", ai_api_key: str = "",
-                   ai_model: str = "") -> Optional[int]:
+                   ai_model: str = "", is_default_admin: bool = False, role: str = 'user') -> Optional[int]:
         """创建新用户"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -173,14 +177,21 @@ class AuthDatabase:
             if access_token is None:
                 access_token = ""
 
+            # 如果是首次创建用户（系统中没有任何用户），自动设置为默认管理员
+            cursor.execute('SELECT COUNT(*) FROM users')
+            user_count = cursor.fetchone()[0]
+            if user_count == 0:
+                is_default_admin = True
+                role = 'admin'
+
             password_hash = self._hash_password(password)
             cursor.execute('''
                 INSERT INTO users (
-                    username, email, password_hash, role, gitlab_url,
+                    username, email, password_hash, role, is_default_admin, gitlab_url,
                     access_token, reviewer_name, ai_api_url, ai_api_key, ai_model, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
-                username, email, password_hash, 'user', gitlab_url,
+                username, email, password_hash, role, int(is_default_admin), gitlab_url,
                 access_token, reviewer_name, ai_api_url, ai_api_key, ai_model,
                 datetime.now().isoformat()
             ))
@@ -447,11 +458,11 @@ class AuthDatabase:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        # 检查是否是默认管理员账户
-        cursor.execute('SELECT username, email FROM users WHERE id = ?', (user_id,))
+        # 检查是否是默认管理员
+        cursor.execute('SELECT is_default_admin FROM users WHERE id = ?', (user_id,))
         user_info = cursor.fetchone()
 
-        if user_info and user_info[0] == 'admin' and user_info[1] == 'admin@autocodereview.com':
+        if user_info and user_info[0] == 1:
             conn.close()
             return False  # 不允许停用默认管理员
 
@@ -484,11 +495,11 @@ class AuthDatabase:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        # 检查是否是默认管理员账户
-        cursor.execute('SELECT username, email, role FROM users WHERE id = ?', (user_id,))
+        # 检查是否是默认管理员
+        cursor.execute('SELECT is_default_admin, role FROM users WHERE id = ?', (user_id,))
         user_info = cursor.fetchone()
 
-        if user_info and user_info[0] == 'admin' and user_info[1] == 'admin@autocodereview.com':
+        if user_info and user_info[0] == 1:
             if new_role != 'admin':
                 conn.close()
                 return False  # 不允许将默认管理员降级为普通用户
@@ -506,10 +517,10 @@ class AuthDatabase:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        # 检查是否是默认管理员账户
-        cursor.execute('SELECT username, email FROM users WHERE id = ?', (user_id,))
+        # 检查是否是默认管理员
+        cursor.execute('SELECT is_default_admin FROM users WHERE id = ?', (user_id,))
         user_info = cursor.fetchone()
-        if user_info and user_info[0] == 'admin' and user_info[1] == 'admin@autocodereview.com':
+        if user_info and user_info[0] == 1:
             conn.close()
             return False  # 不允许删除默认管理员
 
