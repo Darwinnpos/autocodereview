@@ -114,10 +114,18 @@ if (typeof axios !== 'undefined') {
 
             // 处理401未登录错误
             if (error.response && error.response.status === 401) {
-                console.warn('检测到401未登录，跳转到登录页...');
-                // 保存当前URL，登录后可以跳回
-                const returnUrl = encodeURIComponent(window.location.pathname + window.location.search);
-                window.location.href = `/login?return=${returnUrl}`;
+                // 排除登录接口本身的401错误（密码错误）和注册接口
+                const isLoginRequest = originalRequest.url && originalRequest.url.includes('/api/login');
+                const isRegisterRequest = originalRequest.url && originalRequest.url.includes('/api/register');
+                const isPublicPage = window.location.pathname === '/login' || window.location.pathname === '/register';
+
+                // 如果是登录/注册请求失败，或者已经在登录/注册页面，不要跳转
+                if (!isLoginRequest && !isRegisterRequest && !isPublicPage) {
+                    console.warn('检测到401未登录，跳转到登录页...');
+                    // 保存当前URL，登录后可以跳回
+                    const returnUrl = encodeURIComponent(window.location.pathname + window.location.search);
+                    window.location.href = `/login?return=${returnUrl}`;
+                }
                 return Promise.reject(error);
             }
 
