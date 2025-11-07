@@ -763,6 +763,8 @@ async function performUserAction(userId, action) {
         }
     } catch (error) {
         showAlert('danger', '操作失败: ' + (error.response?.data?.error || error.message));
+        // 关闭模态框
+        bootstrap.Modal.getInstance(document.getElementById('userActionModal')).hide();
     } finally {
         confirmBtn.disabled = false;
         confirmBtn.innerHTML = '确认';
@@ -1062,6 +1064,8 @@ async function performPasswordReset(userId) {
         }
     } catch (error) {
         showAlert('danger', '重置密码失败: ' + (error.response?.data?.error || error.message));
+        // 关闭模态框
+        bootstrap.Modal.getInstance(document.getElementById('passwordResetModal')).hide();
     } finally {
         confirmBtn.disabled = false;
         confirmBtn.innerHTML = '重置密码';
