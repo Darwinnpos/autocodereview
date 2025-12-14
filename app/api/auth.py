@@ -543,6 +543,48 @@ def get_all_reviews():
         return jsonify({'error': '服务器内部错误'}), 500
 
 
+@bp.route('/test-gitlab-connection', methods=['POST'])
+def test_gitlab_connection_endpoint():
+    """测试GitLab连接（用于配置页面的测试按钮）"""
+    try:
+        user_id = session.get('user_id')
+        if not user_id:
+            return jsonify({'error': '未登录'}), 401
+
+        data = request.get_json()
+        gitlab_url = data.get('gitlab_url', '').strip()
+        access_token = data.get('access_token', '').strip()
+
+        if not gitlab_url:
+            return jsonify({'error': 'GitLab URL不能为空'}), 400
+
+        # 如果没有提供access_token,尝试从已保存的配置中获取
+        if not access_token:
+            user = auth_db.get_user_by_id(user_id)
+            if user and user.access_token:
+                access_token = user.access_token
+            else:
+                return jsonify({'error': '访问令牌不能为空'}), 400
+
+        # 测试连接
+        is_connected, error_msg = test_gitlab_connection(gitlab_url, access_token)
+
+        if is_connected:
+            return jsonify({
+                'success': True,
+                'message': 'GitLab连接测试成功'
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'error': error_msg or 'GitLab连接失败'
+            }), 400
+
+    except Exception as e:
+        logger.error(f"Error in test_gitlab_connection_endpoint: {e}")
+        return jsonify({'error': f'连接测试失败: {str(e)}'}), 500
+
+
 @bp.route('/admin/reviews/statistics', methods=['GET'])
 def get_admin_review_statistics():
     """获取管理员审查统计信息"""

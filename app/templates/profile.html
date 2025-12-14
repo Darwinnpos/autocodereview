@@ -926,8 +926,17 @@ document.getElementById('testConnectionBtn').addEventListener('click', async fun
     const accessToken = document.getElementById('accessToken').value.trim();
     const btn = this;
 
-    if (!gitlabUrl || !accessToken) {
-        showAlert('warning', '请先填写GitLab URL和访问令牌');
+    if (!gitlabUrl) {
+        showAlert('warning', '请先填写GitLab URL');
+        return;
+    }
+
+    // 检查访问令牌：如果字段为空且placeholder显示"已设置"，说明之前已保存过配置
+    const accessTokenField = document.getElementById('accessToken');
+    const hasExistingToken = accessTokenField.placeholder.includes('已设置');
+
+    if (!accessToken && !hasExistingToken) {
+        showAlert('warning', '请先填写访问令牌');
         return;
     }
 
@@ -936,19 +945,20 @@ document.getElementById('testConnectionBtn').addEventListener('click', async fun
     btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> 测试中...';
 
     try {
-        const response = await fetch(`${gitlabUrl}/api/v4/user`, {
-            headers: {
-                'Authorization': `Bearer ${accessToken}`
-            }
+        // 使用后端API进行测试，避免CORS问题
+        const response = await axios.post('/api/test-gitlab-connection', {
+            gitlab_url: gitlabUrl,
+            access_token: accessToken || null  // 如果为空，后端会使用已保存的token
         });
 
-        if (response.ok) {
+        if (response.data.success) {
             showAlert('success', 'GitLab连接测试成功！');
         } else {
-            showAlert('danger', `GitLab连接失败: ${response.status}`);
+            showAlert('danger', `GitLab连接失败: ${response.data.error || '未知错误'}`);
         }
     } catch (error) {
-        showAlert('danger', `连接测试失败: ${error.message}`);
+        const errorMsg = error.response?.data?.error || error.message;
+        showAlert('danger', `连接测试失败: ${errorMsg}`);
     } finally {
         btn.disabled = false;
         btn.innerHTML = originalText;
