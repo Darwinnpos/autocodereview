@@ -6,11 +6,23 @@ from typing import Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
+# 默认请求超时时间（秒）
+DEFAULT_TIMEOUT = 30
+
 
 class GitLabClient:
-    def __init__(self, gitlab_url: str, access_token: str):
+    def __init__(self, gitlab_url: str, access_token: str, timeout: int = DEFAULT_TIMEOUT):
+        """
+        初始化GitLab客户端
+
+        Args:
+            gitlab_url: GitLab服务器URL
+            access_token: 访问令牌
+            timeout: 请求超时时间（秒），默认30秒
+        """
         self.gitlab_url = gitlab_url.rstrip('/')
         self.access_token = access_token
+        self.timeout = timeout
         self.headers = {
             'Authorization': f'Bearer {access_token}',
             'Content-Type': 'application/json'
@@ -34,7 +46,7 @@ class GitLabClient:
     def _get_project_id(self, project_path: str) -> str:
         """根据项目路径获取项目ID"""
         url = f"{self.gitlab_url}/api/v4/projects/{project_path.replace('/', '%2F')}"
-        response = requests.get(url, headers=self.headers)
+        response = requests.get(url, headers=self.headers, timeout=self.timeout)
 
         if response.status_code != 200:
             raise Exception(f"Failed to get project info: {response.text}")
@@ -44,7 +56,7 @@ class GitLabClient:
     def get_current_user(self) -> Dict:
         """获取当前用户信息"""
         url = f"{self.gitlab_url}/api/v4/user"
-        response = requests.get(url, headers=self.headers)
+        response = requests.get(url, headers=self.headers, timeout=self.timeout)
 
         if response.status_code != 200:
             raise Exception(f"Failed to get current user info: {response.text}")
