@@ -543,6 +543,48 @@ def get_all_reviews():
         return jsonify({'error': '服务器内部错误'}), 500
 
 
+@bp.route('/test-gitlab-connection', methods=['POST'])
+def test_gitlab_connection_endpoint():
+    """测试GitLab连接（用于配置页面的测试按钮）"""
+    try:
+        user_id = session.get('user_id')
+        if not user_id:
+            return jsonify({'error': '未登录'}), 401
+
+        data = request.get_json()
+        gitlab_url = data.get('gitlab_url', '').strip()
+        access_token = data.get('access_token', '').strip()
+
+        if not gitlab_url:
+            return jsonify({'error': 'GitLab URL不能为空'}), 400
+
+        # 如果没有提供access_token,尝试从已保存的配置中获取
+        if not access_token:
+            user = auth_db.get_user_by_id(user_id)
+            if user and user.access_token:
+                access_token = user.access_token
+            else:
+                return jsonify({'error': '访问令牌不能为空'}), 400
+
+        # 测试连接
+        is_connected, error_msg = test_gitlab_connection(gitlab_url, access_token)
+
+        if is_connected:
+            return jsonify({
+                'success': True,
+                'message': 'GitLab连接测试成功'
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'error': error_msg or 'GitLab连接失败'
+            }), 400
+
+    except Exception as e:
+        logger.error(f"Error in test_gitlab_connection_endpoint: {e}")
+        return jsonify({'error': f'连接测试失败: {str(e)}'}), 500
+
+
 @bp.route('/admin/reviews/statistics', methods=['GET'])
 def get_admin_review_statistics():
     """获取管理员审查统计信息"""
@@ -601,134 +643,3 @@ def get_admin_review_statistics():
         return jsonify({'error': '服务器内部错误'}), 500
 
 
-@bp.route('/system-status', methods=['GET'])
-def system_status():
-    """检查系统初始化状态"""
-    try:
-        # 检查是否存在管理员用户
-        import sqlite3
-        import os
-
-        # 如果数据库文件不存在，视为未初始化
-        if not os.path.exists(auth_db.db_path):
-            return jsonify({
-                'success': True,
-                'initialized': False,
-                'needs_setup': True
-            }), 200
-
-        conn = sqlite3.connect(auth_db.db_path)
-        cursor = conn.cursor()
-
-        # 检查users表是否存在
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")
-        table_exists = cursor.fetchone()
-
-        if not table_exists:
-            conn.close()
-            return jsonify({
-                'success': True,
-                'initialized': False,
-                'needs_setup': True
-            }), 200
-
-        # 检查是否有管理员
-        cursor.execute('SELECT COUNT(*) FROM users WHERE role = "admin"')
-        admin_count = cursor.fetchone()[0]
-        conn.close()
-
-        return jsonify({
-            'success': True,
-            'initialized': admin_count > 0,
-            'needs_setup': admin_count == 0
-        }), 200
-
-    except Exception as e:
-        logger.error(f"Error in system_status: {e}")
-        # 即使出错，也返回需要设置的状态
-        return jsonify({
-            'success': True,
-            'initialized': False,
-            'needs_setup': True
-        }), 200
-
-
-@bp.route('/initial-setup', methods=['POST'])
-@rate_limit('default', tokens=5)  # 首次设置消费5个令牌
-def initial_setup():
-    """首次设置管理员账户（仅在没有管理员时可用）"""
-    try:
-        # 检查是否已有管理员
-        import sqlite3
-        conn = sqlite3.connect(auth_db.db_path)
-        cursor = conn.cursor()
-        cursor.execute('SELECT COUNT(*) FROM users WHERE role = "admin"')
-        admin_count = cursor.fetchone()[0]
-
-        if admin_count > 0:
-            conn.close()
-            return jsonify({'error': '系统已初始化，无法重复设置'}), 403
-
-        # 获取请求数据
-        data = request.get_json()
-        required_fields = ['username', 'email', 'password']
-        for field in required_fields:
-            if not data.get(field):
-                conn.close()
-                return jsonify({'error': f'缺少必填字段: {field}'}), 400
-
-        username = data['username'].strip()
-        email = data['email'].strip().lower()
-        password = data['password']
-
-        # 验证用户名
-        if len(username) < 3 or len(username) > 50:
-            conn.close()
-            return jsonify({'error': '用户名长度必须在3-50字符之间'}), 400
-
-        if not re.match(r'^[a-zA-Z0-9_-]+$', username):
-            conn.close()
-            return jsonify({'error': '用户名只能包含字母、数字、下划线和横线'}), 400
-
-        # 验证邮箱
-        if not validate_email(email):
-            conn.close()
-            return jsonify({'error': '邮箱格式不正确'}), 400
-
-        # 验证密码
-        is_valid, error_msg = validate_password(password)
-        if not is_valid:
-            conn.close()
-            return jsonify({'error': error_msg}), 400
-
-        # 创建管理员用户
-        from datetime import datetime
-        password_hash = auth_db._hash_password(password)
-
-        cursor.execute('''
-            INSERT INTO users (
-                username, email, password_hash, role, gitlab_url,
-                access_token, reviewer_name, ai_api_url, ai_api_key, ai_model, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            username, email, password_hash, 'admin',
-            'https://gitlab.com', '', 'AdminReviewer',
-            'https://api.openai.com/v1', '', 'gpt-3.5-turbo',
-            datetime.now().isoformat()
-        ))
-
-        user_id = cursor.lastrowid
-        conn.commit()
-        conn.close()
-
-        logger.info(f"Initial admin user created: {username} (ID: {user_id})")
-
-        return jsonify({
-            'success': True,
-            'message': '管理员账户创建成功',
-            'user_id': user_id
-        }), 201
-
-    except Exception as e:
-        logger.error(f"Error in initial_setup: {e}")
-        return jsonify({'error': '服务器内部错误'}), 500

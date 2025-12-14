@@ -113,32 +113,27 @@ class AuthDatabase:
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions (session_token)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions (user_id)')
 
-        # 创建默认管理员用户（仅当设置了环境变量时）
+        # 创建默认管理员用户（用户名: admin, 密码: 123456）
         cursor.execute('SELECT COUNT(*) FROM users WHERE role = "admin"')
         admin_count = cursor.fetchone()[0]
 
         if admin_count == 0:
-            # 从环境变量获取初始管理员密码
-            initial_admin_password = os.environ.get('INITIAL_ADMIN_PASSWORD')
-
-            if initial_admin_password:
-                # 仅在设置了环境变量时创建管理员
-                logger.info("Creating initial admin user from environment variable")
-                admin_password = self._hash_password(initial_admin_password)
-                cursor.execute('''
-                    INSERT INTO users (
-                        username, email, password_hash, role, gitlab_url,
-                        access_token, reviewer_name, ai_api_url, ai_api_key, ai_model, created_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ''', (
-                    'admin', 'admin@autocodereview.com', admin_password, 'admin',
-                    'https://gitlab.com', '', 'AdminReviewer',
-                    'https://api.openai.com/v1', '', 'gpt-3.5-turbo',
-                    datetime.now().isoformat()
-                ))
-                logger.info("Initial admin user created successfully")
-            else:
-                logger.warning("No admin user exists and INITIAL_ADMIN_PASSWORD not set. Use first-time setup wizard.")
+            # 创建默认管理员账户
+            logger.info("Creating default admin user (admin/123456)")
+            admin_password = self._hash_password('123456')
+            cursor.execute('''
+                INSERT INTO users (
+                    username, email, password_hash, role, gitlab_url,
+                    access_token, reviewer_name, ai_api_url, ai_api_key, ai_model, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                'admin', 'admin@autocodereview.com', admin_password, 'admin',
+                'https://gitlab.com', '', 'AdminReviewer',
+                'https://api.openai.com/v1', '', 'gpt-3.5-turbo',
+                datetime.now().isoformat()
+            ))
+            logger.info("Default admin user created successfully (username: admin, password: 123456)")
+            logger.warning("⚠️  SECURITY: Please change the default admin password after first login!")
 
         conn.commit()
         conn.close()
