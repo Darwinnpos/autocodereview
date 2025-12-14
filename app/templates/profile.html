@@ -207,29 +207,39 @@
                                                 <div class="form-check">
                                                     <input class="form-check-input" type="radio" name="reviewMode" id="serialMode" value="serial" checked>
                                                     <label class="form-check-label" for="serialMode">
-                                                        <strong>串行模式</strong> <span class="badge bg-info small">默认</span>
+                                                        <strong>串行模式</strong> <span class="badge bg-info small">推荐</span>
                                                     </label>
                                                 </div>
                                                 <small class="text-muted d-block mt-2">
                                                     逐个文件依次审查<br>
-                                                    资源占用低，适合稳定场景
+                                                    资源占用低，稳定可靠
                                                 </small>
                                             </div>
                                         </div>
                                     </div>
                                     <div class="col-md-6">
                                         <div class="card border-primary h-100">
-                                            <div class="card-body text-center p-3">
-                                                <div class="form-check">
+                                            <div class="card-body p-3">
+                                                <div class="form-check text-center">
                                                     <input class="form-check-input" type="radio" name="reviewMode" id="parallelMode" value="parallel">
                                                     <label class="form-check-label" for="parallelMode">
                                                         <strong>并行模式</strong> <span class="badge bg-warning small">实验性</span>
                                                     </label>
                                                 </div>
-                                                <small class="text-muted d-block mt-2">
+                                                <small class="text-muted d-block mt-2 text-center">
                                                     多个文件同时审查<br>
                                                     速度更快，资源占用较高
                                                 </small>
+                                                <div class="mt-3" id="parallelSettings" style="display: none;">
+                                                    <label for="maxParallelTasks" class="form-label small">
+                                                        <i class="bi bi-cpu"></i> 并行任务数
+                                                    </label>
+                                                    <input type="number" class="form-control form-control-sm"
+                                                           id="maxParallelTasks"
+                                                           min="1" max="10" value="3"
+                                                           placeholder="1-10">
+                                                    <div class="form-text">建议: 2-5个任务</div>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -511,6 +521,9 @@ function populateProfile(user) {
         modeRadio.checked = true;
     }
 
+    // 显示/隐藏并行设置
+    toggleParallelSettings(reviewMode === 'parallel');
+
     if (user.review_config) {
         try {
             const reviewConfig = typeof user.review_config === 'string'
@@ -534,6 +547,10 @@ function populateProfile(user) {
             document.getElementById('checkMaintainability').checked = reviewConfig.check_maintainability || false;
             document.getElementById('checkComplexity').checked = reviewConfig.check_complexity || false;
             document.getElementById('checkReusability').checked = reviewConfig.check_reusability || false;
+
+            // 并行任务数
+            const maxParallelTasks = reviewConfig.max_parallel_tasks || 3;
+            document.getElementById('maxParallelTasks').value = maxParallelTasks;
 
             // 更新全选状态
             updateSelectAllState();
@@ -681,7 +698,9 @@ document.getElementById('reviewForm').addEventListener('submit', async function(
             check_tests: document.getElementById('checkTests').checked,
             check_maintainability: document.getElementById('checkMaintainability').checked,
             check_complexity: document.getElementById('checkComplexity').checked,
-            check_reusability: document.getElementById('checkReusability').checked
+            check_reusability: document.getElementById('checkReusability').checked,
+            // 并行任务数
+            max_parallel_tasks: parseInt(document.getElementById('maxParallelTasks').value) || 3
         };
 
         // 获取严重程度等级
@@ -962,6 +981,22 @@ document.getElementById('testConnectionBtn').addEventListener('click', async fun
     } finally {
         btn.disabled = false;
         btn.innerHTML = originalText;
+    }
+});
+
+// 控制并行设置显示/隐藏
+function toggleParallelSettings(show) {
+    const parallelSettings = document.getElementById('parallelSettings');
+    if (parallelSettings) {
+        parallelSettings.style.display = show ? 'block' : 'none';
+    }
+}
+
+// 监听审查模式变化
+document.addEventListener('change', function(e) {
+    if (e.target.name === 'reviewMode') {
+        const isParallel = e.target.value === 'parallel';
+        toggleParallelSettings(isParallel);
     }
 });
 
