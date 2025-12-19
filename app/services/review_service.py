@@ -1736,19 +1736,19 @@ class ReviewService:
             self.logger.info("Cleaning up ReviewService resources...")
 
             # 清理Agent编排系统
-            if self.agent_orchestrator:
+            if self.agent_orchestrator and hasattr(self.agent_orchestrator, 'shutdown'):
                 try:
                     self.agent_orchestrator.shutdown()
                 except Exception as e:
                     self.logger.error(f"Error shutting down agent orchestrator: {e}")
 
-            if self.resource_manager:
+            if self.resource_manager and hasattr(self.resource_manager, 'shutdown'):
                 try:
                     self.resource_manager.shutdown()
                 except Exception as e:
                     self.logger.error(f"Error shutting down resource manager: {e}")
 
-            if self.task_scheduler:
+            if self.task_scheduler and hasattr(self.task_scheduler, 'shutdown'):
                 try:
                     self.task_scheduler.shutdown()
                 except Exception as e:

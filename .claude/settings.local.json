@@ -11,7 +11,8 @@
       "Bash(git remote add:*)",
       "Bash(git config:*)",
       "Bash(set:*)",
-      "Bash(python create_test_mr.py:*)"
+      "Bash(python create_test_mr.py:*)",
+      "Bash(python test_optimizations.py:*)"
     ],
     "deny": [],
     "ask": []
