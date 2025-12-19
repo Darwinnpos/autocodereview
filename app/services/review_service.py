@@ -1729,3 +1729,55 @@ class ReviewService:
             raise
 
         return analyzed_files, all_issues, issue_records
+
+    def cleanup(self):
+        """清理服务资源"""
+        try:
+            self.logger.info("Cleaning up ReviewService resources...")
+
+            # 清理Agent编排系统
+            if self.agent_orchestrator:
+                try:
+                    self.agent_orchestrator.shutdown()
+                except Exception as e:
+                    self.logger.error(f"Error shutting down agent orchestrator: {e}")
+
+            if self.resource_manager:
+                try:
+                    self.resource_manager.shutdown()
+                except Exception as e:
+                    self.logger.error(f"Error shutting down resource manager: {e}")
+
+            if self.task_scheduler:
+                try:
+                    self.task_scheduler.shutdown()
+                except Exception as e:
+                    self.logger.error(f"Error shutting down task scheduler: {e}")
+
+            # 清理数据库连接
+            try:
+                if hasattr(self.db, 'cleanup'):
+                    self.db.cleanup()
+                if hasattr(self.auth_db, 'cleanup'):
+                    self.auth_db.cleanup()
+            except Exception as e:
+                self.logger.error(f"Error cleaning up database connections: {e}")
+
+            # 清理进度存储
+            with self._progress_lock:
+                self._progress_storage.clear()
+
+            with self._cancellation_lock:
+                self._cancellation_flags.clear()
+
+            self.logger.info("ReviewService resources cleaned up successfully")
+
+        except Exception as e:
+            self.logger.error(f"Error during cleanup: {e}")
+
+    def __del__(self):
+        """析构函数，确保资源被释放"""
+        try:
+            self.cleanup()
+        except:
+            pass

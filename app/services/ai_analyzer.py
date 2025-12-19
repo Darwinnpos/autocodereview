@@ -4,6 +4,7 @@ import requests
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 import logging
+import time
 
 
 @dataclass
@@ -38,6 +39,8 @@ class AICodeAnalyzer:
         self.ai_model = ai_config.get('ai_model', 'gpt-3.5-turbo')
         self.severity_level = ai_config.get('review_severity_level', 'standard')
         self.logger = logging.getLogger(__name__)
+        self.max_retries = 3  # 最大重试次数
+        self.retry_delay = 2  # 重试延迟（秒）
         
     def validate_model_availability(self) -> bool:
         """验证AI模型是否可用"""
@@ -472,7 +475,7 @@ class AICodeAnalyzer:
         return '\n\n'.join(snippets)
 
     def _call_ai_api(self, prompt: str) -> Dict[str, Any]:
-        """调用AI API"""
+        """调用AI API（带重试机制）"""
         url = f"{self.ai_api_url.rstrip('/')}/chat/completions"
 
         headers = {
@@ -491,13 +494,63 @@ class AICodeAnalyzer:
                     'role': 'user',
                     'content': prompt
                 }
-            ]
+            ],
+            'temperature': 0.3  # 降低温度以获得更稳定的输出
         }
 
-        response = requests.post(url, json=data, headers=headers, timeout=600)
-        response.raise_for_status()
+        last_error = None
+        for attempt in range(self.max_retries):
+            try:
+                self.logger.debug(f"AI API call attempt {attempt + 1}/{self.max_retries}")
+                response = requests.post(url, json=data, headers=headers, timeout=600)
+                response.raise_for_status()
+                return response.json()
 
-        return response.json()
+            except requests.exceptions.Timeout as e:
+                last_error = e
+                self.logger.warning(f"AI API timeout on attempt {attempt + 1}/{self.max_retries}")
+                if attempt < self.max_retries - 1:
+                    time.sleep(self.retry_delay * (attempt + 1))  # 指数退避
+                    continue
+                else:
+                    raise
+
+            except requests.exceptions.ConnectionError as e:
+                last_error = e
+                self.logger.warning(f"AI API connection error on attempt {attempt + 1}/{self.max_retries}")
+                if attempt < self.max_retries - 1:
+                    time.sleep(self.retry_delay * (attempt + 1))
+                    continue
+                else:
+                    raise
+
+            except requests.exceptions.HTTPError as e:
+                # 对于某些HTTP错误不进行重试
+                if e.response and e.response.status_code in [400, 401, 403]:
+                    # 客户端错误，不重试
+                    raise
+                elif e.response and e.response.status_code == 429:
+                    # 限流错误，延长等待时间重试
+                    last_error = e
+                    self.logger.warning(f"AI API rate limit on attempt {attempt + 1}/{self.max_retries}")
+                    if attempt < self.max_retries - 1:
+                        time.sleep(self.retry_delay * (attempt + 1) * 2)  # 更长的等待时间
+                        continue
+                    else:
+                        raise
+                else:
+                    # 服务器错误，重试
+                    last_error = e
+                    self.logger.warning(f"AI API server error on attempt {attempt + 1}/{self.max_retries}")
+                    if attempt < self.max_retries - 1:
+                        time.sleep(self.retry_delay * (attempt + 1))
+                        continue
+                    else:
+                        raise
+
+        # 如果所有重试都失败，抛出最后一个错误
+        if last_error:
+            raise last_error
 
     def _parse_ai_response(self, response: Dict[str, Any], context: AIAnalysisContext) -> List[CodeIssue]:
         """解析AI响应"""
