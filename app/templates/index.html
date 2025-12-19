@@ -222,6 +222,12 @@ document.getElementById('reviewForm').addEventListener('submit', async function(
     const resultCard = document.getElementById('resultCard');
     const resultContent = document.getElementById('resultContent');
 
+    // 显示日志卡片并添加初始日志
+    LogManager.show();
+    LogManager.clearLog();
+    LogManager.addLog('开始代码审查流程', 'info');
+    LogManager.addLog(`MR URL: ${mrUrl}`, 'debug');
+
     // 显示加载状态
     submitBtn.disabled = true;
     submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> 启动中...';
@@ -244,6 +250,8 @@ document.getElementById('reviewForm').addEventListener('submit', async function(
             console.log('Full API response:', response.data);
             const reviewId = response.data.review_id;
             console.log('Starting progress polling for review ID:', reviewId);
+
+            LogManager.addLog(`审查已启动，ID: ${reviewId}`, 'success');
 
             if (reviewId) {
                 // 保存当前审查ID用于取消功能
@@ -279,6 +287,7 @@ document.getElementById('reviewForm').addEventListener('submit', async function(
         progressCard.style.display = 'none';
 
         const errorMessage = error.response?.data?.error || error.message;
+        LogManager.addLog(`审查启动失败: ${errorMessage}`, 'error');
         let errorIcon = 'bi-exclamation-triangle';
         let errorTitle = '审查失败';
         let errorSuggestion = '';
@@ -426,6 +435,11 @@ function updateProgressCounts(progress) {
     const statusText = statusTexts[progress.status] || progress.status;
     document.getElementById('progressStatus').textContent = statusText;
 
+    // 添加日志 - 记录当前正在处理的文件
+    if (progress.current_file && progress.status === 'analyzing') {
+        LogManager.addLog(`正在分析: ${progress.current_file}`, 'debug');
+    }
+
     // 更新进度条
     let percentage = 0;
     if (progress.status === 'preparing' || progress.total_files === 0) {
@@ -560,6 +574,10 @@ async function showFinalResult(reviewId) {
         if (response.data.success) {
             const data = response.data.data;
 
+            // 添加完成日志
+            LogManager.addLog(`审查完成! 分析了 ${data.analysis_summary.total_files_analyzed} 个文件`, 'success');
+            LogManager.addLog(`发现 ${data.analysis_summary.total_issues_found} 个问题`, 'info');
+
             // 隐藏进度卡片，显示结果
             progressCard.style.display = 'none';
 
@@ -623,6 +641,7 @@ async function showFinalResult(reviewId) {
         progressCard.style.display = 'none';
 
         const errorMessage = error.response?.data?.error || error.message;
+        LogManager.addLog(`获取审查结果失败: ${errorMessage}`, 'error');
         let errorIcon = 'bi-exclamation-triangle';
         let errorTitle = '获取结果失败';
         let errorSuggestion = '';
@@ -1242,6 +1261,9 @@ function handleCancelledReview() {
     const resultCard = document.getElementById('resultCard');
     const resultContent = document.getElementById('resultContent');
 
+    // 添加取消日志
+    LogManager.addLog('审查已被取消', 'warning');
+
     // 隐藏进度卡片
     progressCard.style.display = 'none';
 
@@ -1294,8 +1316,11 @@ document.getElementById('cancelReviewBtn').addEventListener('click', async funct
     }
 
     if (!confirm('确定要取消当前的代码审查吗？\n取消后将无法恢复已分析的数据。')) {
+        LogManager.addLog('用户取消了取消操作', 'info');
         return;
     }
+
+    LogManager.addLog('用户请求取消审查...', 'warning');
 
     const cancelBtn = this;
     const originalText = cancelBtn.innerHTML;
@@ -1308,6 +1333,8 @@ document.getElementById('cancelReviewBtn').addEventListener('click', async funct
         const response = await axios.post(`/api/review/${currentReviewIdForCancel}/cancel`);
 
         if (response.data.success) {
+            LogManager.addLog('审查已成功取消', 'success');
+
             // 停止进度轮询
             if (reviewProgressInterval) {
                 clearInterval(reviewProgressInterval);
@@ -1347,6 +1374,7 @@ document.getElementById('cancelReviewBtn').addEventListener('click', async funct
         }
     } catch (error) {
         const errorMessage = error.response?.data?.error || error.message;
+        LogManager.addLog(`取消审查失败: ${errorMessage}`, 'error');
         showToast('error', '取消审查失败: ' + errorMessage);
     } finally {
         // 恢复取消按钮状态
@@ -1512,52 +1540,6 @@ const LogManager = {
 // 初始化日志管理器
 document.addEventListener('DOMContentLoaded', () => {
     LogManager.init();
-});
-
-// 在开始审查时显示日志并添加初始日志
-const originalStartReview = startReview;
-async function startReview(event) {
-    // 显示日志卡片
-    LogManager.show();
-    LogManager.clearLog();
-    LogManager.addLog('开始代码审查流程', 'info');
-
-    // 调用原始函数
-    await originalStartReview(event);
-}
-
-// 扩展 updateProgress 函数以添加日志
-const originalUpdateProgress = updateProgress;
-function updateProgress() {
-    originalUpdateProgress();
-
-    // 从进度信息提取日志
-    const status = document.getElementById('progressStatus').textContent;
-    const fileName = document.getElementById('currentFileName').textContent;
-
-    if (fileName && fileName !== '') {
-        LogManager.addLog(`正在分析文件: ${fileName}`, 'debug');
-    }
-}
-
-// 在审查完成时添加日志
-document.addEventListener('reviewCompleted', (event) => {
-    const detail = event.detail;
-    if (detail.success) {
-        LogManager.addLog(`审查完成，发现 ${detail.issueCount || 0} 个问题`, 'success');
-    } else {
-        LogManager.addLog(`审查失败: ${detail.error || '未知错误'}`, 'error');
-    }
-});
-
-// 在取消审查时添加日志
-const cancelBtn = document.getElementById('cancelReviewBtn');
-if (cancelBtn) {
-    cancelBtn.addEventListener('click', () => {
-        LogManager.addLog('用户取消审查操作', 'warning');
-    });
-}
-
 });
 </script>
 
