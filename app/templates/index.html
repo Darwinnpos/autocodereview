@@ -83,6 +83,46 @@
             </div>
         </div>
 
+        <!-- 实时日志对话框 -->
+        <div id="logCard" class="card mt-4" style="display: none;">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-terminal"></i>
+                    审查日志
+                </h5>
+                <div class="btn-group btn-group-sm" role="group">
+                    <button type="button" class="btn btn-outline-secondary" id="clearLogBtn" title="清除日志">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" id="toggleAutoScrollBtn" title="自动滚动">
+                        <i class="bi bi-arrows-expand"></i>
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" id="downloadLogBtn" title="下载日志">
+                        <i class="bi bi-download"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div id="logConsole" class="log-console">
+                    <div id="logContent"></div>
+                </div>
+            </div>
+            <div class="card-footer">
+                <div class="d-flex align-items-center justify-content-between">
+                    <small class="text-muted">
+                        <i class="bi bi-clock"></i>
+                        <span id="logTimestamp">--:--:--</span>
+                        <span class="ms-3">|</span>
+                        <span class="ms-3">共 <span id="logLineCount">0</span> 行</span>
+                    </small>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="autoScrollSwitch" checked>
+                        <label class="form-check-label small" for="autoScrollSwitch">自动滚动</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div id="resultCard" class="card mt-4" style="display: none;">
             <div class="card-header">
                 <h5 class="card-title mb-0">
@@ -1338,5 +1378,300 @@ document.addEventListener('DOMContentLoaded', function() {
         window.history.replaceState({}, '', newUrl);
     }
 });
+
+// ============================================
+// 日志功能
+// ============================================
+
+const LogManager = {
+    autoScroll: true,
+    lineCount: 0,
+
+    init() {
+        this.setupEventListeners();
+    },
+
+    setupEventListeners() {
+        // 清除日志按钮
+        document.getElementById('clearLogBtn').addEventListener('click', () => {
+            this.clearLog();
+        });
+
+        // 下载日志按钮
+        document.getElementById('downloadLogBtn').addEventListener('click', () => {
+            this.downloadLog();
+        });
+
+        // 自动滚动开关
+        document.getElementById('autoScrollSwitch').addEventListener('change', (e) => {
+            this.autoScroll = e.target.checked;
+        });
+
+        // 切换自动滚动按钮
+        document.getElementById('toggleAutoScrollBtn').addEventListener('click', () => {
+            const checkbox = document.getElementById('autoScrollSwitch');
+            checkbox.checked = !checkbox.checked;
+            this.autoScroll = checkbox.checked;
+        });
+    },
+
+    show() {
+        document.getElementById('logCard').style.display = 'block';
+        this.updateTimestamp();
+    },
+
+    hide() {
+        document.getElementById('logCard').style.display = 'none';
+    },
+
+    addLog(message, level = 'info') {
+        const logContent = document.getElementById('logContent');
+        const timestamp = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+
+        // 创建日志行
+        const logLine = document.createElement('div');
+        logLine.className = `log-line log-${level}`;
+
+        // 图标映射
+        const iconMap = {
+            'info': 'bi-info-circle',
+            'success': 'bi-check-circle',
+            'warning': 'bi-exclamation-triangle',
+            'error': 'bi-x-circle',
+            'debug': 'bi-bug'
+        };
+
+        logLine.innerHTML = `
+            <span class="log-timestamp">[${timestamp}]</span>
+            <i class="bi ${iconMap[level] || 'bi-circle'}"></i>
+            <span class="log-message">${this.escapeHtml(message)}</span>
+        `;
+
+        logContent.appendChild(logLine);
+        this.lineCount++;
+
+        // 更新行数显示
+        document.getElementById('logLineCount').textContent = this.lineCount;
+        this.updateTimestamp();
+
+        // 自动滚动
+        if (this.autoScroll) {
+            const logConsole = document.getElementById('logConsole');
+            logConsole.scrollTop = logConsole.scrollHeight;
+        }
+    },
+
+    clearLog() {
+        const logContent = document.getElementById('logContent');
+        logContent.innerHTML = '';
+        this.lineCount = 0;
+        document.getElementById('logLineCount').textContent = '0';
+        this.addLog('日志已清除', 'info');
+    },
+
+    downloadLog() {
+        const logContent = document.getElementById('logContent');
+        const lines = logContent.querySelectorAll('.log-line');
+
+        let content = '='.repeat(60) + '\n';
+        content += 'AutoCodeReview 审查日志\n';
+        content += '生成时间: ' + new Date().toLocaleString('zh-CN') + '\n';
+        content += '='.repeat(60) + '\n\n';
+
+        lines.forEach(line => {
+            content += line.textContent.trim() + '\n';
+        });
+
+        // 创建下载
+        const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `review-log-${Date.now()}.txt`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        this.addLog('日志已下载', 'success');
+    },
+
+    updateTimestamp() {
+        const now = new Date();
+        document.getElementById('logTimestamp').textContent =
+            now.toLocaleTimeString('zh-CN', { hour12: false });
+    },
+
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+};
+
+// 初始化日志管理器
+document.addEventListener('DOMContentLoaded', () => {
+    LogManager.init();
+});
+
+// 在开始审查时显示日志并添加初始日志
+const originalStartReview = startReview;
+async function startReview(event) {
+    // 显示日志卡片
+    LogManager.show();
+    LogManager.clearLog();
+    LogManager.addLog('开始代码审查流程', 'info');
+
+    // 调用原始函数
+    await originalStartReview(event);
+}
+
+// 扩展 updateProgress 函数以添加日志
+const originalUpdateProgress = updateProgress;
+function updateProgress() {
+    originalUpdateProgress();
+
+    // 从进度信息提取日志
+    const status = document.getElementById('progressStatus').textContent;
+    const fileName = document.getElementById('currentFileName').textContent;
+
+    if (fileName && fileName !== '') {
+        LogManager.addLog(`正在分析文件: ${fileName}`, 'debug');
+    }
+}
+
+// 在审查完成时添加日志
+document.addEventListener('reviewCompleted', (event) => {
+    const detail = event.detail;
+    if (detail.success) {
+        LogManager.addLog(`审查完成，发现 ${detail.issueCount || 0} 个问题`, 'success');
+    } else {
+        LogManager.addLog(`审查失败: ${detail.error || '未知错误'}`, 'error');
+    }
+});
+
+// 在取消审查时添加日志
+const cancelBtn = document.getElementById('cancelReviewBtn');
+if (cancelBtn) {
+    cancelBtn.addEventListener('click', () => {
+        LogManager.addLog('用户取消审查操作', 'warning');
+    });
+}
+
+});
 </script>
+
+<style>
+.log-console {
+    background-color: #1e1e1e;
+    color: #d4d4d4;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 13px;
+    max-height: 400px;
+    overflow-y: auto;
+    padding: 12px;
+    border-radius: 4px;
+}
+
+.log-line {
+    padding: 4px 0;
+    line-height: 1.5;
+    word-wrap: break-word;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.log-timestamp {
+    color: #858585;
+    font-size: 11px;
+    flex-shrink: 0;
+}
+
+.log-message {
+    flex: 1;
+}
+
+.log-line i {
+    flex-shrink: 0;
+}
+
+/* 不同级别的日志颜色 */
+.log-info {
+    color: #4ec9b0;
+}
+
+.log-info i {
+    color: #4ec9b0;
+}
+
+.log-success {
+    color: #4caf50;
+}
+
+.log-success i {
+    color: #4caf50;
+}
+
+.log-warning {
+    color: #ff9800;
+}
+
+.log-warning i {
+    color: #ff9800;
+}
+
+.log-error {
+    color: #f44336;
+}
+
+.log-error i {
+    color: #f44336;
+}
+
+.log-debug {
+    color: #9cdcfe;
+}
+
+.log-debug i {
+    color: #9cdcfe;
+}
+
+/* 滚动条样式 */
+.log-console::-webkit-scrollbar {
+    width: 8px;
+}
+
+.log-console::-webkit-scrollbar-track {
+    background: #2d2d2d;
+}
+
+.log-console::-webkit-scrollbar-thumb {
+    background: #555;
+    border-radius: 4px;
+}
+
+.log-console::-webkit-scrollbar-thumb:hover {
+    background: #777;
+}
+
+/* 日志卡片footer样式 */
+#logCard .card-footer {
+    background-color: #f8f9fa;
+    border-top: 1px solid #dee2e6;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+    .log-console {
+        max-height: 300px;
+        font-size: 12px;
+    }
+
+    .log-timestamp {
+        font-size: 10px;
+    }
+}
+</style>
+
 {% endblock %}
