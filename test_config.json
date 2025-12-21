@@ -1,0 +1,25 @@
+{
+  "description": "本地测试配置 - 用于AutoCodeReview功能验证",
+  "gitlab": {
+    "url": "http://localhost",
+    "access_token": "glpat-2Lx1k8lMTPwQgOPdIyAxOW86MQp1OjEH.01.0w1sltjh9",
+    "project_path": "root/autocodereview"
+  },
+  "test_merge_request": {
+    "url": "http://localhost/root/autocodereview/-/merge_requests/1",
+    "iid": 1,
+    "title": "测试代码审查功能 - 添加输入验证和超时配置",
+    "source_branch": "test-review-feature",
+    "target_branch": "main",
+    "description": "用于测试AI代码审查功能的MR，包含输入验证工具和GitLab客户端超时配置改进"
+  },
+  "usage": {
+    "note": "此配置文件包含本地GitLab的访问令牌，请勿提交到公共仓库",
+    "test_steps": [
+      "1. 访问 http://localhost:5000 登录系统（admin/123456）",
+      "2. 在配置页面设置GitLab URL和访问令牌",
+      "3. 使用测试MR URL进行代码审查",
+      "4. 验证AI审查、评论生成、发布等功能"
+    ]
+  }
+}

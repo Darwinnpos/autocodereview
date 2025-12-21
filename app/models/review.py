@@ -262,6 +262,23 @@ class ReviewDatabase:
         conn.close()
         return success
 
+    def restore_comment(self, issue_id: int) -> bool:
+        """恢复被拒绝的评论"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        cursor.execute('''
+            UPDATE issues SET
+                comment_status = 'pending',
+                confirmed_at = NULL
+            WHERE id = ? AND comment_status = 'rejected'
+        ''', (issue_id,))
+
+        success = cursor.rowcount > 0
+        conn.commit()
+        conn.close()
+        return success
+
     def bulk_confirm_comments(self, issue_ids: List[int]) -> int:
         """批量确认评论"""
         conn = sqlite3.connect(self.db_path)

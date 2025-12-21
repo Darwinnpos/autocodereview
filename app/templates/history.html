@@ -153,9 +153,9 @@
     <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">
-                    <i class="bi bi-file-text"></i>
-                    审查详情
+                <h5 class="modal-title" id="reviewDetailModalTitle">
+                    <i class="bi bi-chat-dots"></i>
+                    待确认评论 (0 条)
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
@@ -516,69 +516,275 @@ async function showReviewDetail(reviewId) {
     }
 }
 
+// 历史审查详情的全局变量
+let historyCurrentComments = [];
+let historyCurrentReviewId = null;
+let historyCurrentPage = 1;
+const historyPageSize = 5;
+
 function renderReviewDetailModal(review) {
     const content = document.getElementById('reviewDetailContent');
-    content.innerHTML = `
-        <div class="row">
-            <div class="col-md-6">
-                <h6>基本信息</h6>
-                <table class="table table-sm">
-                    <tr><td>项目路径</td><td>${review.project_path || 'N/A'}</td></tr>
-                    <tr><td>项目ID</td><td>${review.project_id || 'N/A'}</td></tr>
-                    <tr><td>MR ID</td><td>!${review.mr_iid || 'N/A'}</td></tr>
-                    <tr><td>MR标题</td><td>${review.mr_title || 'N/A'}</td></tr>
-                    <tr><td>MR作者</td><td>${review.mr_author || 'N/A'}</td></tr>
-                    <tr><td>源分支</td><td>${review.source_branch || 'N/A'}</td></tr>
-                    <tr><td>目标分支</td><td>${review.target_branch || 'N/A'}</td></tr>
-                </table>
-            </div>
-            <div class="col-md-6">
-                <h6>分析结果</h6>
-                <table class="table table-sm">
-                    <tr><td>分析文件数</td><td>${review.total_files_analyzed || 0}</td></tr>
-                    <tr><td>发现问题数</td><td>${review.total_issues_found || 0}</td></tr>
-                    <tr><td>错误</td><td><span class="badge bg-danger">${review.error_count || 0}</span></td></tr>
-                    <tr><td>警告</td><td><span class="badge bg-warning">${review.warning_count || 0}</span></td></tr>
-                    <tr><td>建议</td><td><span class="badge bg-info">${review.info_count || 0}</span></td></tr>
-                    <tr><td>已发布评论</td><td>${review.comments_posted || 0}</td></tr>
-                    <tr><td>评论发布失败</td><td>${review.comment_errors_count || 0}</td></tr>
-                </table>
-            </div>
-        </div>
 
-        <div class="row mt-3">
-            <div class="col-12">
-                <h6>时间信息</h6>
-                <table class="table table-sm">
-                    <tr><td>创建时间</td><td>${new Date(review.created_at).toLocaleString('zh-CN')}</td></tr>
-                    <tr><td>完成时间</td><td>${review.completed_at ? new Date(review.completed_at).toLocaleString('zh-CN') : '未完成'}</td></tr>
-                    <tr><td>状态</td><td>
-                        ${review.status === 'completed' ? '<span class="badge bg-success">已完成</span>' :
-                          review.status === 'failed' ? '<span class="badge bg-danger">失败</span>' :
-                          review.status === 'pending' ? '<span class="badge bg-primary">进行中</span>' :
-                          '<span class="badge bg-secondary">已取消</span>'}
-                    </td></tr>
-                    ${review.error_message ? `<tr><td>错误信息</td><td class="text-danger">${review.error_message}</td></tr>` : ''}
-                </table>
-            </div>
-        </div>
+    // 更新模态框标题
+    const modalTitle = document.getElementById('reviewDetailModalTitle');
+    const issueCount = review.issues ? review.issues.length : 0;
+    modalTitle.innerHTML = `
+        <i class="bi bi-chat-dots"></i>
+        待确认评论 (${issueCount} 条)
+    `;
 
-        <div class="row mt-3">
-            <div class="col-12">
-                <h6>快速操作</h6>
-                <div class="btn-group" role="group">
-                    ${review.mr_url ? `
-                        <button class="btn btn-primary" onclick="openMR('${review.mr_url}')">
-                            <i class="bi bi-arrow-up-right-square"></i> 查看MR
+    // 如果有问题,显示问题列表(完全复用主页样式)
+    let issuesHtml = '';
+    if (review.issues && review.issues.length > 0) {
+        historyCurrentComments = review.issues;
+        historyCurrentReviewId = review.id;
+        historyCurrentPage = 1;
+
+        const totalPages = Math.ceil(review.issues.length / historyPageSize);
+
+        issuesHtml = `
+            <div>
+
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div>
+                        <button type="button" class="btn btn-success btn-sm" onclick="historySelectAllComments()">
+                            <i class="bi bi-check-all"></i>
+                            全选当前页
                         </button>
-                        <button class="btn btn-success" onclick="reviewAgain('${review.mr_url}')">
-                            <i class="bi bi-arrow-clockwise"></i> 重新审查
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="historyClearAllSelections()">
+                            <i class="bi bi-x-square"></i>
+                            清空选择
                         </button>
-                    ` : ''}
+                        <span class="text-muted ms-3" id="historyPageInfo">第 1 页，共 ${totalPages} 页</span>
+                    </div>
+                    <button type="button" class="btn btn-primary btn-sm" onclick="historyBulkResubmit()">
+                        <i class="bi bi-send"></i>
+                        批量确认选中的评论
+                    </button>
+                </div>
+
+                <nav aria-label="问题分页" class="mb-3">
+                    <ul class="pagination pagination-sm justify-content-center" id="historyPaginationTop"></ul>
+                </nav>
+
+                <div id="historyIssuesContainer"></div>
+
+                <nav aria-label="问题分页" class="mt-3">
+                    <ul class="pagination pagination-sm justify-content-center" id="historyPaginationBottom"></ul>
+                </nav>
+            </div>
+        `;
+    } else {
+        issuesHtml = `
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle"></i>
+                该审查没有发现任何问题
+            </div>
+        `;
+    }
+
+    content.innerHTML = issuesHtml;
+
+    // 加载第一页问题
+    if (review.issues && review.issues.length > 0) {
+        historyLoadIssuesPage(1);
+    }
+}
+
+function historyLoadIssuesPage(page) {
+    historyCurrentPage = page;
+    const startIndex = (page - 1) * historyPageSize;
+    const endIndex = Math.min(startIndex + historyPageSize, historyCurrentComments.length);
+    const pageIssues = historyCurrentComments.slice(startIndex, endIndex);
+
+    console.log(`Loading history issues page ${page}:`, {
+        totalIssues: historyCurrentComments.length,
+        pageIssues: pageIssues.length,
+        reviewId: historyCurrentReviewId
+    });
+
+    // 生成问题HTML
+    const issuesHtml = pageIssues.map(issue => historyGenerateIssueHtml(issue, historyCurrentReviewId)).join('');
+    document.getElementById('historyIssuesContainer').innerHTML = issuesHtml;
+
+    // 自动加载当前页所有问题的代码上下文
+    console.log('Loading context for issues:', pageIssues.map(i => i.id));
+    pageIssues.forEach(issue => {
+        historyLoadCodeContext(historyCurrentReviewId, issue.id);
+    });
+
+    // 更新页面信息
+    const totalPages = Math.ceil(historyCurrentComments.length / historyPageSize);
+    document.getElementById('historyPageInfo').textContent =
+        `第 ${page} 页，共 ${totalPages} 页 (显示 ${startIndex + 1}-${endIndex} / ${historyCurrentComments.length})`;
+
+    // 更新分页
+    historyUpdatePagination(page, totalPages);
+}
+
+function historyGenerateIssueHtml(issue, reviewId) {
+    const severityColor = issue.severity === 'error' ? 'danger' : issue.severity === 'warning' ? 'warning' : 'info';
+    const confidenceColor = (issue.confidence || 0) >= 0.8 ? 'success' : (issue.confidence || 0) >= 0.5 ? 'warning' : 'secondary';
+    const status = issue.comment_status || 'pending';
+
+    // 根据状态确定卡片样式和按钮
+    let cardClass = 'card mb-3 comment-card';
+    let buttonsHtml = '';
+    let statusBadgeHtml = '';
+
+    if (status === 'rejected') {
+        cardClass += ' rejected-comment';
+        statusBadgeHtml = '<span class="badge bg-secondary ms-2 rejected-badge"><i class="bi bi-x-circle"></i> 已拒绝</span>';
+        buttonsHtml = `
+            <button type="button" class="btn btn-outline-secondary btn-sm me-2" onclick="historyToggleCommentBody(${issue.id})">
+                <i class="bi bi-chevron-down" id="toggle-icon-${issue.id}"></i>
+            </button>
+            <button type="button" class="btn btn-warning btn-sm restore-btn" onclick="historyRestoreComment(${reviewId}, ${issue.id})">
+                <i class="bi bi-arrow-counterclockwise"></i> 恢复
+            </button>
+        `;
+    } else if (status === 'confirmed' || status === 'posted') {
+        cardClass += ' confirmed-comment';
+        statusBadgeHtml = '<span class="badge bg-success ms-2"><i class="bi bi-check-circle"></i> 已确认</span>';
+        buttonsHtml = `
+            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="historyToggleCommentBody(${issue.id})">
+                <i class="bi bi-chevron-down" id="toggle-icon-${issue.id}"></i>
+            </button>
+        `;
+    } else {
+        // pending 状态
+        buttonsHtml = `
+            <button type="button" class="btn btn-outline-secondary btn-sm me-2" onclick="historyToggleCommentBody(${issue.id})">
+                <i class="bi bi-chevron-up" id="toggle-icon-${issue.id}"></i>
+            </button>
+            <div class="btn-group" role="group">
+                <button type="button" class="btn btn-success btn-sm" onclick="historyConfirmComment(${reviewId}, ${issue.id})">
+                    <i class="bi bi-check"></i> 确认
+                </button>
+                <button type="button" class="btn btn-danger btn-sm" onclick="historyRejectComment(${reviewId}, ${issue.id})">
+                    <i class="bi bi-x"></i> 拒绝
+                </button>
+            </div>
+        `;
+    }
+
+    return `
+        <div class="${cardClass}" data-issue-id="${issue.id}">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <div class="form-check">
+                    <input class="form-check-input history-issue-checkbox" type="checkbox" value="${issue.id}" ${status !== 'pending' ? 'disabled' : ''}>
+                    <label class="form-check-label">
+                        <strong>${issue.file_path}:${issue.line_number || '?'}</strong>
+                        <span class="badge bg-${severityColor} ms-2">${issue.severity}</span>
+                        <span class="badge bg-secondary ms-1">${issue.category || 'general'}</span>
+                        ${issue.confidence ? `
+                            <span class="badge bg-${confidenceColor} ms-1" title="AI确信程度">
+                                ${(issue.confidence * 100).toFixed(0)}%
+                            </span>
+                        ` : ''}
+                        ${statusBadgeHtml}
+                    </label>
+                </div>
+                <div>
+                    ${buttonsHtml}
+                </div>
+            </div>
+            <div class="card-body" style="${status === 'rejected' || status === 'confirmed' || status === 'posted' ? 'display: none;' : ''}">
+                <!-- 代码上下文容器 -->
+                <div class="code-context-container mb-3" id="history-context-${issue.id}">
+                    <div class="text-center p-3 border rounded bg-light">
+                        <div class="spinner-border spinner-border-sm" role="status">
+                            <span class="visually-hidden">加载中...</span>
+                        </div>
+                        <div class="mt-2 text-muted">正在加载代码上下文...</div>
+                    </div>
+                </div>
+
+                <!-- 问题和建议 -->
+                <div class="border-top pt-3">
+                    <p class="mb-2"><strong>问题:</strong> ${issue.message || '无描述'}</p>
+                    <p class="mb-0"><strong>建议:</strong> ${issue.suggestion || '无'}</p>
                 </div>
             </div>
         </div>
     `;
+}
+
+function historyUpdatePagination(currentPage, totalPages) {
+    const paginationHtml = historyGeneratePaginationHtml(currentPage, totalPages);
+    document.getElementById('historyPaginationTop').innerHTML = paginationHtml;
+    document.getElementById('historyPaginationBottom').innerHTML = paginationHtml;
+}
+
+function historyGeneratePaginationHtml(currentPage, totalPages) {
+    if (totalPages <= 1) return '';
+
+    let html = '';
+    html += `<li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+        <a class="page-link" href="#" onclick="historyGoToPage(${currentPage - 1}); return false;">上一页</a>
+    </li>`;
+
+    for (let i = 1; i <= totalPages; i++) {
+        html += `<li class="page-item ${i === currentPage ? 'active' : ''}">
+            <a class="page-link" href="#" onclick="historyGoToPage(${i}); return false;">${i}</a>
+        </li>`;
+    }
+
+    html += `<li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
+        <a class="page-link" href="#" onclick="historyGoToPage(${currentPage + 1}); return false;">下一页</a>
+    </li>`;
+
+    return html;
+}
+
+function historyGoToPage(page) {
+    const totalPages = Math.ceil(historyCurrentComments.length / historyPageSize);
+    if (page < 1 || page > totalPages) return;
+    historyLoadIssuesPage(page);
+}
+
+function historySelectAllComments() {
+    document.querySelectorAll('.history-issue-checkbox').forEach(cb => cb.checked = true);
+}
+
+function historyClearAllSelections() {
+    document.querySelectorAll('.history-issue-checkbox').forEach(cb => cb.checked = false);
+}
+
+async function historyBulkResubmit() {
+    const checkedBoxes = document.querySelectorAll('.history-issue-checkbox:checked:not(:disabled)');
+    const issueIds = Array.from(checkedBoxes).map(cb => parseInt(cb.value));
+
+    if (issueIds.length === 0) {
+        alert('请先选择待确认的评论');
+        return;
+    }
+
+    if (!confirm(`确定要批量确认并发布选中的 ${issueIds.length} 个评论到GitLab吗？`)) {
+        return;
+    }
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const issueId of issueIds) {
+        try {
+            const response = await axios.post(`/api/review/${historyCurrentReviewId}/confirm-comment/${issueId}`);
+            if (response.data.success) {
+                successCount++;
+            } else {
+                failCount++;
+            }
+        } catch (error) {
+            failCount++;
+        }
+    }
+
+    alert(`批量确认完成！\n成功: ${successCount} 个\n失败: ${failCount} 个`);
+
+    if (successCount > 0) {
+        showReviewDetail(historyCurrentReviewId);
+    }
 }
 
 function openMR(mrUrl) {
@@ -593,5 +799,364 @@ function reviewAgain(mrUrl) {
         window.location.href = `/?mr_url=${encodeURIComponent(mrUrl)}`;
     }
 }
+
+// 加载代码上下文
+async function historyLoadCodeContext(reviewId, issueId) {
+    const contextContainer = document.getElementById(`history-context-${issueId}`);
+    if (!contextContainer) {
+        console.error(`Context container not found for issue ${issueId}`);
+        return;
+    }
+
+    try {
+        console.log(`Loading context for review ${reviewId}, issue ${issueId}`);
+        const response = await axios.get(`/api/review/${reviewId}/comment/${issueId}/context`);
+        console.log(`Context response for issue ${issueId}:`, response.data);
+
+        if (response.data.success && response.data.data) {
+            // API返回的结构是 {success: true, data: {issue_id: xxx, context: {...}}}
+            // 我们需要提取context部分
+            const context = response.data.data.context;
+            if (context) {
+                // 使用与主页相同的样式容器
+                contextContainer.innerHTML = `
+                    <div class="border rounded" style="font-family: 'Courier New', monospace; font-size: 13px; overflow-x: auto; background-color: white;">
+                        ${historyGenerateCodeContextHtml(context)}
+                    </div>
+                `;
+            } else {
+                console.warn(`No context in response for issue ${issueId}:`, response.data);
+                contextContainer.innerHTML = '<div class="alert alert-warning mb-0">无法加载代码上下文</div>';
+            }
+        } else {
+            console.warn(`No context data for issue ${issueId}:`, response.data);
+            contextContainer.innerHTML = '<div class="alert alert-warning mb-0">无法加载代码上下文</div>';
+        }
+    } catch (error) {
+        console.error(`Failed to load code context for issue ${issueId}:`, error);
+        console.error('Error details:', error.response?.data);
+        const errorMsg = error.response?.data?.error || error.message || '未知错误';
+        contextContainer.innerHTML = `<div class="alert alert-danger mb-0">加载代码上下文失败: ${errorMsg}</div>`;
+    }
+}
+
+// 生成代码上下文HTML
+function historyGenerateCodeContextHtml(context) {
+    if (!context) return '';
+
+    // 使用数组拼接而非字符串连接，提高性能
+    const lines = [];
+
+    // 渲染前面的行
+    if (context.lines_before && context.lines_before.length > 0) {
+        context.lines_before.forEach(line => {
+            lines.push(historyRenderSingleLine(line));
+        });
+    }
+
+    // 渲染目标行之前的删除行
+    if (context.target_deleted_lines && context.target_deleted_lines.length > 0) {
+        context.target_deleted_lines.forEach(line => {
+            lines.push(historyRenderSingleLine(line));
+        });
+    }
+
+    // 渲染目标行（问题行）
+    if (context.target_line) {
+        lines.push(historyRenderTargetLine(context.target_line));
+    }
+
+    // 渲染后面的行
+    if (context.lines_after && context.lines_after.length > 0) {
+        context.lines_after.forEach(line => {
+            lines.push(historyRenderSingleLine(line));
+        });
+    }
+
+    return lines.join('');
+}
+
+function historyRenderSingleLine(line) {
+    // 根据行的类型选择背景颜色和边框
+    let bgColor, borderColor, textColor, lineNumberColor, prefix;
+
+    // 处理行号（移除删除行的 ~ 前缀）
+    let displayLineNumber = line.line_number;
+    if (typeof displayLineNumber === 'string' && displayLineNumber.startsWith('~')) {
+        displayLineNumber = displayLineNumber.substring(1);
+    }
+
+    if (line.is_deleted) {
+        // 删除行 - 红色背景
+        bgColor = '#ffeef0';
+        borderColor = '#f85149';
+        textColor = '#82071e';
+        lineNumberColor = '#f85149';
+        prefix = '-';
+    } else if (line.is_added) {
+        // 新增行 - 绿色背景
+        bgColor = '#e6ffec';
+        borderColor = '#2da44e';
+        textColor = '#055d20';
+        lineNumberColor = '#2da44e';
+        prefix = '+';
+    } else if (line.is_changed) {
+        // 修改行 - 黄色背景
+        bgColor = '#fff9db';
+        borderColor = '#f7dc6f';
+        textColor = '#2c3e50';
+        lineNumberColor = '#6c757d';
+        prefix = ' ';  // 单个空格
+    } else {
+        // 未变更行 - 白色背景
+        bgColor = 'white';
+        borderColor = '#dee2e6';
+        textColor = '#495057';
+        lineNumberColor = '#6c757d';
+        prefix = ' ';  // 单个空格
+    }
+
+    return `<div class="code-line context-line" style="background-color: ${bgColor}; color: ${textColor}; padding: 4px 12px; border-left: 2px solid ${borderColor}; line-height: 1.4;">
+        <span class="line-prefix" style="color: ${lineNumberColor}; margin-right: 8px; width: 12px; display: inline-block; text-align: center; font-family: 'Consolas', 'Monaco', monospace; font-weight: bold;">${prefix}</span>
+        <span class="line-number" style="color: ${lineNumberColor}; margin-right: 12px; min-width: 45px; display: inline-block; font-family: 'Consolas', 'Monaco', monospace; text-align: right;">${displayLineNumber}</span>
+        <span class="line-content" style="font-family: 'Consolas', 'Monaco', 'Courier New', monospace; white-space: pre; tab-size: 4;">${historyPreserveSpaces(escapeHtml(line.content))}</span>
+    </div>`;
+}
+
+function historyRenderTargetLine(line) {
+    // 目标行（报告问题的行）- 使用红色粗边框高亮，但背景根据类型变化
+    let bgColor, textColor, prefix;
+
+    // 处理行号（移除删除行的 ~ 前缀）
+    let displayLineNumber = line.line_number;
+    if (typeof displayLineNumber === 'string' && displayLineNumber.startsWith('~')) {
+        displayLineNumber = displayLineNumber.substring(1);
+    }
+
+    if (line.is_deleted) {
+        bgColor = '#ffeef0';
+        textColor = '#82071e';
+        prefix = '-';
+    } else if (line.is_added) {
+        bgColor = '#e6ffec';
+        textColor = '#055d20';
+        prefix = '+';
+    } else if (line.is_changed) {
+        bgColor = '#fff9db';
+        textColor = '#2c3e50';
+        prefix = ' ';
+    } else {
+        bgColor = '#fff5f5';
+        textColor = '#d63384';
+        prefix = ' ';
+    }
+
+    return `<div class="code-line target-line" style="background-color: ${bgColor}; color: ${textColor}; padding: 4px 12px; border-left: 4px solid #dc3545; line-height: 1.4; font-weight: 500;">
+        <span class="line-prefix" style="color: #dc3545; margin-right: 8px; width: 12px; display: inline-block; text-align: center; font-family: 'Consolas', 'Monaco', monospace; font-weight: bold;">${prefix}</span>
+        <span class="line-number" style="color: #dc3545; margin-right: 12px; min-width: 45px; display: inline-block; font-family: 'Consolas', 'Monaco', monospace; text-align: right; font-weight: bold;">${displayLineNumber}</span>
+        <span class="line-content" style="font-family: 'Consolas', 'Monaco', 'Courier New', monospace; white-space: pre; tab-size: 4;">${historyPreserveSpaces(escapeHtml(line.content))}</span>
+    </div>`;
+}
+
+function historyPreserveSpaces(text) {
+    // 保留原始空格和制表符
+    return text.replace(/ /g, ' ').replace(/\t/g, '    ');
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// 切换评论详情展开/收起
+function historyToggleCommentBody(issueId) {
+    const card = document.querySelector(`[data-issue-id="${issueId}"]`);
+    if (!card) return;
+
+    const cardBody = card.querySelector('.card-body');
+    const toggleIcon = document.getElementById(`toggle-icon-${issueId}`);
+
+    if (cardBody && toggleIcon) {
+        if (cardBody.style.display === 'none') {
+            // 展开
+            cardBody.style.display = 'block';
+            toggleIcon.classList.remove('bi-chevron-down');
+            toggleIcon.classList.add('bi-chevron-up');
+        } else {
+            // 收起
+            cardBody.style.display = 'none';
+            toggleIcon.classList.remove('bi-chevron-up');
+            toggleIcon.classList.add('bi-chevron-down');
+        }
+    }
+}
+
+// 确认评论
+async function historyConfirmComment(reviewId, issueId) {
+    try {
+        const response = await axios.post(`/api/review/${reviewId}/confirm-comment/${issueId}`);
+        if (response.data.success) {
+            alert('评论已确认并发布到GitLab！');
+            showReviewDetail(reviewId);
+        } else {
+            alert('确认失败: ' + (response.data.error || '未知错误'));
+        }
+    } catch (error) {
+        alert('确认失败: ' + (error.response?.data?.error || error.message));
+    }
+}
+
+// 拒绝评论
+async function historyRejectComment(reviewId, issueId) {
+    try {
+        const response = await axios.post(`/api/review/${reviewId}/reject-comment/${issueId}`);
+        if (response.data.success) {
+            // 更新缓存数组中的评论状态
+            const issue = historyCurrentComments.find(i => i.id === issueId);
+            if (issue) {
+                issue.comment_status = 'rejected';
+            }
+
+            // 折叠该评论卡片
+            const card = document.querySelector(`[data-issue-id="${issueId}"]`);
+            if (card) {
+                card.classList.add('rejected-comment');
+                const cardBody = card.querySelector('.card-body');
+                if (cardBody) cardBody.style.display = 'none';
+
+                // 更新切换按钮图标为向下（因为已折叠）
+                const toggleIcon = document.getElementById(`toggle-icon-${issueId}`);
+                if (toggleIcon) {
+                    toggleIcon.classList.remove('bi-chevron-up');
+                    toggleIcon.classList.add('bi-chevron-down');
+                }
+
+                // 找到按钮容器并替换内容
+                const cardHeader = card.querySelector('.card-header');
+                const buttonContainer = cardHeader?.querySelector('div:last-child');
+                if (buttonContainer) {
+                    // 添加已拒绝标签到label中
+                    const label = cardHeader.querySelector('.form-check-label');
+                    if (label && !label.querySelector('.rejected-badge')) {
+                        const rejectedBadge = document.createElement('span');
+                        rejectedBadge.className = 'badge bg-secondary ms-2 rejected-badge';
+                        rejectedBadge.innerHTML = '<i class="bi bi-x-circle"></i> 已拒绝';
+                        label.appendChild(rejectedBadge);
+                    }
+
+                    // 替换按钮容器内容
+                    buttonContainer.innerHTML = `
+                        <button type="button" class="btn btn-outline-secondary btn-sm me-2" onclick="historyToggleCommentBody(${issueId})">
+                            <i class="bi bi-chevron-down" id="toggle-icon-${issueId}"></i>
+                        </button>
+                        <button type="button" class="btn btn-warning btn-sm restore-btn" onclick="historyRestoreComment(${reviewId}, ${issueId})">
+                            <i class="bi bi-arrow-counterclockwise"></i> 恢复
+                        </button>
+                    `;
+                }
+            }
+            alert('评论已拒绝');
+        } else {
+            alert('拒绝失败: ' + (response.data.error || '未知错误'));
+        }
+    } catch (error) {
+        alert('拒绝失败: ' + (error.response?.data?.error || error.message));
+    }
+}
+
+// 恢复评论
+async function historyRestoreComment(reviewId, issueId) {
+    try {
+        const response = await axios.post(`/api/review/${reviewId}/restore-comment/${issueId}`);
+        if (response.data.success) {
+            // 更新缓存数组中的评论状态
+            const issue = historyCurrentComments.find(i => i.id === issueId);
+            if (issue) {
+                issue.comment_status = 'pending';
+            }
+
+            // 恢复评论卡片
+            const card = document.querySelector(`[data-issue-id="${issueId}"]`);
+            if (card) {
+                card.classList.remove('rejected-comment');
+                const cardBody = card.querySelector('.card-body');
+                if (cardBody) cardBody.style.display = 'block';
+
+                // 更新切换按钮图标为向上（因为已展开）
+                const toggleIcon = document.getElementById(`toggle-icon-${issueId}`);
+                if (toggleIcon) {
+                    toggleIcon.classList.remove('bi-chevron-down');
+                    toggleIcon.classList.add('bi-chevron-up');
+                }
+
+                // 找到按钮容器并恢复原始按钮
+                const cardHeader = card.querySelector('.card-header');
+                const buttonContainer = cardHeader?.querySelector('div:last-child');
+                if (buttonContainer) {
+                    // 移除已拒绝标签
+                    const rejectedBadge = cardHeader.querySelector('.rejected-badge');
+                    if (rejectedBadge) rejectedBadge.remove();
+
+                    // 恢复按钮容器内容
+                    buttonContainer.innerHTML = `
+                        <button type="button" class="btn btn-outline-secondary btn-sm me-2" onclick="historyToggleCommentBody(${issueId})">
+                            <i class="bi bi-chevron-up" id="toggle-icon-${issueId}"></i>
+                        </button>
+                        <div class="btn-group" role="group">
+                            <button type="button" class="btn btn-success btn-sm" onclick="historyConfirmComment(${reviewId}, ${issueId})">
+                                <i class="bi bi-check"></i> 确认
+                            </button>
+                            <button type="button" class="btn btn-danger btn-sm" onclick="historyRejectComment(${reviewId}, ${issueId})">
+                                <i class="bi bi-x"></i> 拒绝
+                            </button>
+                        </div>
+                    `;
+                }
+            }
+            alert('评论已恢复');
+        } else {
+            alert('恢复失败: ' + (response.data.error || '未知错误'));
+        }
+    } catch (error) {
+        alert('恢复失败: ' + (error.response?.data?.error || error.message));
+    }
+}
 </script>
+
+<style>
+/* 被拒绝的评论样式 */
+.rejected-comment {
+    opacity: 0.6;
+    background-color: #f8f9fa;
+    border-left: 3px solid #6c757d;
+}
+
+.rejected-comment .card-header {
+    background-color: #e9ecef;
+}
+
+/* 已确认的评论样式 */
+.confirmed-comment {
+    opacity: 0.7;
+    background-color: #f0f9ff;
+    border-left: 3px solid #28a745;
+}
+
+.confirmed-comment .card-header {
+    background-color: #d4edda;
+}
+
+/* 代码上下文样式 */
+.code-context pre {
+    white-space: pre;
+    overflow-x: auto;
+}
+
+.code-context code {
+    display: block;
+    line-height: 1.5;
+}
+</style>
+
 {% endblock %}

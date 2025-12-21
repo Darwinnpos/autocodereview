@@ -320,9 +320,18 @@ def update_user_status(user_id):
         elif action == 'reset_password':
             new_password = data.get('new_password')
             if not new_password:
+                logger.error(f"Reset password failed: new_password is missing")
                 return jsonify({'success': False, 'error': '缺少新密码'}), 400
+
+            logger.info(f"Attempting to reset password for user_id: {user_id}")
             success = auth_db.reset_user_password(user_id, new_password)
-            message = '密码已重置'
+            logger.info(f"Password reset result for user_id {user_id}: {success}")
+
+            if success:
+                message = '密码已重置'
+            else:
+                logger.error(f"Password reset failed for user_id {user_id}: auth_db.reset_user_password returned False")
+                return jsonify({'success': False, 'error': '重置密码失败，用户可能不存在'}), 500
         else:
             return jsonify({'success': False, 'error': '无效的操作类型'}), 400
 
@@ -332,10 +341,10 @@ def update_user_status(user_id):
             return jsonify({'success': False, 'error': '操作失败'}), 500
 
     except Exception as e:
-        print(f"Error updating user status: {e}")
+        logger.error(f"Error updating user status: {e}", exc_info=True)
         return jsonify({
             'success': False,
-            'error': '更新用户状态失败'
+            'error': f'更新用户状态失败: {str(e)}'
         }), 500
 
 

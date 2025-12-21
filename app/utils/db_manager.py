@@ -6,6 +6,7 @@ from contextlib import contextmanager
 from typing import Generator
 import queue
 import time
+import atexit
 
 
 class DatabaseConnectionManager:
@@ -19,9 +20,13 @@ class DatabaseConnectionManager:
         self.active_connections = 0
         self.lock = threading.RLock()
         self.logger = logging.getLogger(__name__)
+        self._closed = False
 
         # 初始化连接池
         self._initialize_pool()
+
+        # 注册程序退出时的清理函数
+        atexit.register(self.close_all)
 
     def _initialize_pool(self):
         """初始化连接池"""
@@ -61,6 +66,9 @@ class DatabaseConnectionManager:
 
     def _get_connection(self) -> sqlite3.Connection:
         """从连接池获取连接"""
+        if self._closed:
+            raise sqlite3.OperationalError("Connection pool is closed")
+
         try:
             # 尝试从池中获取连接
             try:
@@ -201,13 +209,32 @@ class DatabaseConnectionManager:
 
     def close_all(self):
         """关闭所有连接"""
-        while not self.pool.empty():
-            try:
-                conn = self.pool.get_nowait()
-                conn.close()
-            except:
-                pass
-        self.active_connections = 0
+        if self._closed:
+            return
+
+        with self.lock:
+            self._closed = True
+            self.logger.info(f"Closing connection pool for {self.db_path}")
+
+            # 关闭池中的所有连接
+            closed_count = 0
+            while not self.pool.empty():
+                try:
+                    conn = self.pool.get_nowait()
+                    conn.close()
+                    closed_count += 1
+                except Exception as e:
+                    self.logger.error(f"Error closing connection: {e}")
+
+            self.active_connections = 0
+            self.logger.info(f"Closed {closed_count} connections for {self.db_path}")
+
+    def __del__(self):
+        """析构函数，确保资源被释放"""
+        try:
+            self.close_all()
+        except:
+            pass
 
     def get_stats(self) -> dict:
         """获取连接池统计信息"""
