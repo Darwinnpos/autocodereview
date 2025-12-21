@@ -345,6 +345,97 @@ def delete_review(review_id):
         })
 
 
+@history_bp.route('/api/history/review/<int:review_id>/issue/<int:issue_id>/resubmit', methods=['POST'])
+def resubmit_issue(review_id, issue_id):
+    """重新提交单个问题为GitLab评论"""
+    try:
+        is_logged_in, user = require_login()
+        if not is_logged_in:
+            return jsonify({'success': False, 'error': '请先登录'})
+
+        # 获取审查记录
+        review = review_db.get_review_record(review_id)
+        if not review:
+            return jsonify({'success': False, 'error': '审查记录不存在'})
+
+        # 权限检查
+        user_id, role = get_user_info(user)
+        username = user.username if hasattr(user, 'username') else user.get('username', '')
+        if review['user_id'] != username:
+            return jsonify({'success': False, 'error': '权限不足'})
+
+        # 获取问题详情
+        issues = review_db.get_review_issues(review_id)
+        issue = None
+        for iss in issues:
+            if iss['id'] == issue_id:
+                issue = iss
+                break
+
+        if not issue:
+            return jsonify({'success': False, 'error': '问题不存在'})
+
+        # 获取用户的GitLab配置
+        user_config = auth_db.get_user_by_id(session['user_id'])
+        if not user_config or not user_config.gitlab_url or not user_config.access_token:
+            return jsonify({'success': False, 'error': 'GitLab配置不完整，请先在个人资料中配置'})
+
+        # 创建GitLab客户端
+        from app.services.gitlab_client import GitLabClient
+        gitlab_client = GitLabClient(
+            gitlab_url=user_config.gitlab_url,
+            access_token=user_config.access_token
+        )
+
+        # 格式化评论内容
+        severity_emoji = {
+            'error': '🔴',
+            'warning': '🟡',
+            'info': '🔵'
+        }
+        severity_text = {
+            'error': '错误',
+            'warning': '警告',
+            'info': '建议'
+        }
+
+        emoji = severity_emoji.get(issue['severity'], '⚪')
+        sev_text = severity_text.get(issue['severity'], '问题')
+
+        comment_body = f"{emoji} **{sev_text}**: {issue['message']}"
+        if issue.get('suggestion'):
+            comment_body += f"\n\n💡 **建议**: {issue['suggestion']}"
+
+        # 提交评论
+        success = gitlab_client.add_mr_comment(
+            project_id=review['project_id'],
+            mr_iid=review['mr_iid'],
+            comment=comment_body,
+            file_path=issue.get('file_path'),
+            line_number=issue.get('line_number')
+        )
+
+        if success:
+            return jsonify({
+                'success': True,
+                'message': '问题已成功提交为GitLab评论'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'GitLab评论提交失败，请检查网络连接和GitLab配置'
+            })
+
+    except Exception as e:
+        import traceback
+        print(f"Error resubmitting issue: {e}")
+        print(f"Resubmit error traceback: {traceback.format_exc()}")
+        return jsonify({
+            'success': False,
+            'error': f'重新提交失败: {str(e)}'
+        })
+
+
 @history_bp.route('/api/history/export')
 def export_reviews():
     """导出审查记录"""

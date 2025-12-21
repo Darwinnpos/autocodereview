@@ -395,6 +395,25 @@ def reject_comment(review_id: int, issue_id: int):
         return jsonify({'error': '服务器内部错误'}), 500
 
 
+@bp.route('/review/<int:review_id>/restore-comment/<int:issue_id>', methods=['POST'])
+def restore_comment(review_id: int, issue_id: int):
+    """恢复被拒绝的评论"""
+    try:
+        success = review_service.restore_comment(issue_id)
+
+        if success:
+            return jsonify({
+                'success': True,
+                'message': '评论已恢复'
+            }), 200
+        else:
+            return jsonify({'error': '恢复评论失败'}), 400
+
+    except Exception as e:
+        logger.error(f"Error in restore_comment: {e}")
+        return jsonify({'error': '服务器内部错误'}), 500
+
+
 @bp.route('/review/<int:review_id>/bulk-confirm', methods=['POST'])
 def bulk_confirm_comments(review_id: int):
     """批量确认评论"""

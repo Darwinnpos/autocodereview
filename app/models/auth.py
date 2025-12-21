@@ -537,9 +537,9 @@ class AuthDatabase:
             # 更新密码
             cursor.execute('''
                 UPDATE users
-                SET password_hash = ?, updated_at = ?
+                SET password_hash = ?
                 WHERE id = ?
-            ''', (password_hash, datetime.now().isoformat(), user_id))
+            ''', (password_hash, user_id))
 
             success = cursor.rowcount > 0
 

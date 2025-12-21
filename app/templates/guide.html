@@ -533,8 +533,7 @@ Select scopes:
                     <!-- 方式一：OpenAI -->
                     <div class="step-card card">
                         <div class="card-header bg-success text-white">
-                            <span class="step-number">方式一</span>
-                            <strong>使用 OpenAI API</strong>
+                            <strong>方式一：使用 OpenAI API</strong>
                             <span class="badge bg-light text-dark ms-2">推荐</span>
                         </div>
                         <div class="card-body">
@@ -576,8 +575,7 @@ Select scopes:
                     <!-- 方式二：DeepSeek -->
                     <div class="step-card card">
                         <div class="card-header bg-primary text-white">
-                            <span class="step-number">方式二</span>
-                            <strong>使用 DeepSeek API</strong>
+                            <strong>方式二：使用 DeepSeek API</strong>
                             <span class="badge bg-light text-dark ms-2">性价比高</span>
                         </div>
                         <div class="card-body">
@@ -618,8 +616,7 @@ Select scopes:
                     <!-- 方式三：Open WebUI -->
                     <div class="step-card card">
                         <div class="card-header bg-info text-white">
-                            <span class="step-number">方式三</span>
-                            <strong>使用 Open WebUI（自托管）</strong>
+                            <strong>方式三：使用 Open WebUI（自托管）</strong>
                             <span class="badge bg-light text-dark ms-2">开源免费</span>
                         </div>
                         <div class="card-body">
@@ -669,8 +666,7 @@ Select scopes:
                     <!-- 通用配置步骤 -->
                     <div class="step-card card">
                         <div class="card-header">
-                            <span class="step-number">最后</span>
-                            <strong>完成配置并测试</strong>
+                            <strong>最后：完成配置并测试</strong>
                         </div>
                         <div class="card-body">
                             <h6>步骤一：填写基本信息</h6>
@@ -680,18 +676,17 @@ Select scopes:
                                 <li>填写对应的 AI API URL 和密钥</li>
                             </ol>
 
-                            <h6>步骤二：探测可用模型</h6>
+                            <h6>步骤二：自动探测可用模型</h6>
                             <ol>
                                 <li>填写完API URL和密钥后</li>
-                                <li>点击 <strong>"探测"</strong> 按钮</li>
-                                <li>系统会自动连接API并获取可用模型列表</li>
-                                <li>探测成功后下拉菜单会显示所有可用模型</li>
+                                <li>系统会<strong>自动探测</strong>并连接API获取可用模型列表</li>
+                                <li>探测成功后下拉菜单会自动显示所有可用模型</li>
                             </ol>
 
                             <h6>步骤三：选择和保存模型</h6>
                             <ol>
                                 <li>从下拉菜单中选择合适的模型</li>
-                                <li>推荐选择：<code>qwen3-coder-480b-a35b</code></li>
+                                <li>推荐选择：<code>deepseek-coder</code>（DeepSeek）或 <code>gpt-4</code>（OpenAI）</li>
                                 <li>点击 <strong>"保存AI配置"</strong> 按钮</li>
                                 <li>（可选）点击 <strong>"测试AI连接"</strong> 验证配置</li>
                             </ol>
@@ -699,9 +694,9 @@ Select scopes:
                             <div class="alert alert-warning">
                                 <h6><i class="bi bi-exclamation-triangle"></i> 重要提示</h6>
                                 <ul class="mb-0">
-                                    <li><strong>必须先探测模型</strong>：直接填写模型名称可能无效</li>
-                                    <li><strong>确保网络畅通</strong>：探测过程需要连接到AI服务</li>
-                                    <li><strong>验证API密钥</strong>：密钥错误会导致探测失败</li>
+                                    <li><strong>系统会自动探测模型</strong>：填写API信息后会自动获取可用模型列表</li>
+                                    <li><strong>确保网络畅通</strong>：自动探测过程需要连接到AI服务</li>
+                                    <li><strong>验证API密钥</strong>：密钥错误会导致探测失败，无法获取模型列表</li>
                                 </ul>
                             </div>
 
@@ -941,8 +936,8 @@ https://your-gitlab-domain.com/group/project/-/merge_requests/456</div>
                                 </div>
                                 <div class="card-body">
                                     <ul>
-                                        <li>大型 MR（超过 10 文件/500 行）可能超时</li>
-                                        <li>超长文件（>500 行）建议拆分</li>
+                                        <li>大型 MR 可能超时</li>
+                                        <li>超长文件建议拆分</li>
                                         <li>避免同时审查多个大型 MR</li>
                                         <li>AI 审查仅作辅助，重要代码需人工复查</li>
                                     </ul>
