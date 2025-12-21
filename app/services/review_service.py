@@ -1104,6 +1104,10 @@ class ReviewService:
         """拒绝评论"""
         return self.db.reject_comment(issue_id)
 
+    def restore_comment(self, issue_id: int) -> bool:
+        """恢复被拒绝的评论"""
+        return self.db.restore_comment(issue_id)
+
     def bulk_confirm_comments(self, review_id: int, issue_ids: List[int]) -> Dict:
         """批量确认评论"""
         try:
