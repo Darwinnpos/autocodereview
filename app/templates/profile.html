@@ -369,6 +369,13 @@
 
                     <!-- AI 配置选项卡 -->
                     <div class="tab-pane fade" id="ai-pane" role="tabpanel">
+                        <!-- 全局配置提示（当启用时显示） -->
+                        <div class="alert alert-warning" id="globalConfigAlert" style="display: none;">
+                            <i class="bi bi-shield-lock"></i>
+                            <strong>管理员已启用全局AI配置</strong>
+                            <p class="mb-0 mt-2">当前系统使用管理员统一配置的 AI 服务，个人 AI 配置已被禁用。如需使用个人配置，请联系管理员关闭全局配置。</p>
+                        </div>
+
                         <form id="aiForm">
                             <div class="mb-3">
                                 <label for="aiApiUrl" class="form-label">AI API URL</label>
@@ -449,6 +456,7 @@ let userProfile = null;
 // 页面加载时获取用户资料
 document.addEventListener('DOMContentLoaded', function() {
     loadUserProfile();
+    checkGlobalConfig();
 });
 
 async function loadUserProfile() {
@@ -1040,6 +1048,37 @@ function showAlert(type, message) {
 
     // 自动滚动到提示框
     alertContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+// 检查全局配置状态
+async function checkGlobalConfig() {
+    try {
+        const response = await axios.get('/api/auth/global-config-status');
+        if (response.data.success && response.data.global_enabled) {
+            // 显示全局配置提示
+            document.getElementById('globalConfigAlert').style.display = 'block';
+
+            // 禁用AI配置表单的所有输入
+            const aiForm = document.getElementById('aiForm');
+            const inputs = aiForm.querySelectorAll('input, select, button');
+            inputs.forEach(input => {
+                input.disabled = true;
+                input.classList.add('bg-light');
+            });
+
+            // 如果有全局配置，显示全局配置的值
+            if (response.data.global_config) {
+                document.getElementById('aiApiUrl').value = response.data.global_config.ai_api_url || '';
+                document.getElementById('aiApiKey').value = '••••••••••••••••'; // 不显示真实密钥
+
+                const aiModelSelect = document.getElementById('aiModel');
+                aiModelSelect.innerHTML = `<option value="${response.data.global_config.ai_model}">${response.data.global_config.ai_model}</option>`;
+            }
+        }
+    } catch (error) {
+        // 静默失败，不影响页面加载
+        console.error('检查全局配置失败:', error);
+    }
 }
 </script>
 {% endblock %}
