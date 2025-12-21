@@ -643,3 +643,35 @@ def get_admin_review_statistics():
         return jsonify({'error': '服务器内部错误'}), 500
 
 
+@bp.route('/api/auth/global-config-status', methods=['GET'])
+def get_global_config_status():
+    """获取全局配置状态（用于前端判断是否禁用个人配置）"""
+    try:
+        if 'user_id' not in session:
+            return jsonify({'success': False, 'error': '未登录'}), 401
+
+        # 检查是否启用了全局配置
+        is_global_enabled = auth_db.is_global_ai_enabled()
+
+        result = {
+            'success': True,
+            'global_enabled': is_global_enabled
+        }
+
+        # 如果启用了全局配置，返回全局配置信息（不包含密钥）
+        if is_global_enabled:
+            api_url_config = auth_db.get_global_config('global_ai_api_url')
+            model_config = auth_db.get_global_config('global_ai_model')
+
+            result['global_config'] = {
+                'ai_api_url': api_url_config.get('config_value') if api_url_config else '',
+                'ai_model': model_config.get('config_value') if model_config else ''
+            }
+
+        return jsonify(result), 200
+
+    except Exception as e:
+        logger.error(f"Error getting global config status: {e}")
+        return jsonify({'success': False, 'error': '获取配置状态失败'}), 500
+
+

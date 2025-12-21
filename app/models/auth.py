@@ -97,6 +97,20 @@ class AuthDatabase:
             )
         ''')
 
+        # 全局配置表
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS global_config (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                config_key TEXT UNIQUE NOT NULL,
+                config_value TEXT,
+                is_enabled BOOLEAN DEFAULT 0,
+                description TEXT,
+                updated_by INTEGER,
+                updated_at TEXT,
+                FOREIGN KEY (updated_by) REFERENCES users (id)
+            )
+        ''')
+
         # 添加新字段（如果不存在）
         cursor.execute("PRAGMA table_info(users)")
         columns = [column[1] for column in cursor.fetchall()]
@@ -587,3 +601,89 @@ class AuthDatabase:
             'today_active': today_active,
             'new_this_week': new_this_week
         }
+
+    def get_global_config(self, config_key: str = None) -> Optional[Dict]:
+        """获取全局配置"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+
+            if config_key:
+                cursor.execute('''
+                    SELECT * FROM global_config
+                    WHERE config_key = ?
+                ''', (config_key,))
+                row = cursor.fetchone()
+                conn.close()
+                return dict(row) if row else None
+            else:
+                cursor.execute('SELECT * FROM global_config')
+                rows = cursor.fetchall()
+                conn.close()
+                return [dict(row) for row in rows]
+
+        except Exception as e:
+            logger.error(f"Failed to get global config: {e}")
+            return None
+
+    def set_global_config(self, config_key: str, config_value: str, is_enabled: bool,
+                         description: str, updated_by: int) -> bool:
+        """设置全局配置"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+
+            cursor.execute('''
+                INSERT OR REPLACE INTO global_config
+                (config_key, config_value, is_enabled, description, updated_by, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (config_key, config_value, is_enabled, description, updated_by,
+                  datetime.now().isoformat()))
+
+            conn.commit()
+            conn.close()
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to set global config: {e}")
+            return False
+
+    def get_ai_config_for_user(self, user_id: int) -> Dict:
+        """获取用户的AI配置（优先使用全局配置）"""
+        try:
+            # 检查是否启用全局AI配置
+            global_ai_enabled = self.get_global_config('global_ai_enabled')
+
+            if global_ai_enabled and global_ai_enabled.get('is_enabled'):
+                # 使用全局配置
+                api_url = self.get_global_config('global_ai_api_url')
+                api_key = self.get_global_config('global_ai_api_key')
+                model = self.get_global_config('global_ai_model')
+
+                return {
+                    'ai_api_url': api_url.get('config_value') if api_url else '',
+                    'ai_api_key': api_key.get('config_value') if api_key else '',
+                    'ai_model': model.get('config_value') if model else '',
+                    'is_global': True
+                }
+            else:
+                # 使用用户自己的配置
+                user = self.get_user_by_id(user_id)
+                if user:
+                    return {
+                        'ai_api_url': user.ai_api_url,
+                        'ai_api_key': user.ai_api_key,
+                        'ai_model': user.ai_model,
+                        'is_global': False
+                    }
+                return None
+
+        except Exception as e:
+            logger.error(f"Failed to get AI config for user {user_id}: {e}")
+            return None
+
+    def is_global_ai_enabled(self) -> bool:
+        """检查是否启用了全局AI配置"""
+        config = self.get_global_config('global_ai_enabled')
+        return config and config.get('is_enabled', False)
