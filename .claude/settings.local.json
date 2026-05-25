@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python run.py:*)",
+      "Bash(timeout:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nfix: 修复GitLab连接测试CORS跨域问题\n\n修改GitLab连接测试功能,从前端直接请求改为通过后端API代理,\n解决浏览器CORS策略导致的\"Failed to fetch\"错误。\n\n主要改动:\n- 新增 /api/test-gitlab-connection 后端API端点\n- 支持使用已保存的访问令牌进行测试\n- 改进前端错误提示信息的准确性\n- 避免前端直接跨域请求本地GitLab服务\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git push:*)",
+      "Bash(git commit:*)",
+      "Bash(git diff:*)",
+      "Bash(git remote add:*)",
+      "Bash(git config:*)",
+      "Bash(set:*)",
+      "Bash(python create_test_mr.py:*)",
+      "Bash(python test_optimizations.py:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

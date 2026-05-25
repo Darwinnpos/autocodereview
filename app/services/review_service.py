@@ -256,10 +256,18 @@ class ReviewService:
                 reviewer_name=reviewer_name
             )
 
-            # 添加AI配置到用户配置对象（作为额外属性）
-            user_config.ai_api_url = user.ai_api_url
-            user_config.ai_api_key = user.ai_api_key
-            user_config.ai_model = user.ai_model
+            # 获取AI配置（优先使用全局配置）
+            ai_config = self.auth_db.get_ai_config_for_user(user.id)
+            if ai_config:
+                user_config.ai_api_url = ai_config['ai_api_url']
+                user_config.ai_api_key = ai_config['ai_api_key']
+                user_config.ai_model = ai_config['ai_model']
+                self.logger.info(f"Using {'global' if ai_config.get('is_global') else 'user'} AI configuration")
+            else:
+                # 回退到用户自己的配置
+                user_config.ai_api_url = user.ai_api_url
+                user_config.ai_api_key = user.ai_api_key
+                user_config.ai_model = user.ai_model
 
             # 3. 解析MR URL并获取基本信息
             try:
@@ -317,7 +325,8 @@ class ReviewService:
 
             # 初始化AI分析器
             # 检查API URL配置（API密钥对于本地服务可能不需要）
-            if not user.ai_api_url:
+            # 使用已获取的AI配置（全局配置或用户配置）
+            if not user_config.ai_api_url:
                 error_msg = 'AI API URL未配置，无法进行代码分析'
                 if review_id:
                     self.db.fail_review_record(review_id, error_msg)
@@ -328,7 +337,7 @@ class ReviewService:
                     'review_id': review_id
                 }
 
-            if not user.ai_model:
+            if not user_config.ai_model:
                 error_msg = 'AI模型未配置，无法进行代码分析'
                 if review_id:
                     self.db.fail_review_record(review_id, error_msg)
@@ -340,9 +349,9 @@ class ReviewService:
                 }
 
             ai_config = {
-                'ai_api_url': user.ai_api_url,
-                'ai_api_key': user.ai_api_key,
-                'ai_model': user.ai_model,
+                'ai_api_url': user_config.ai_api_url,
+                'ai_api_key': user_config.ai_api_key,
+                'ai_model': user_config.ai_model,
                 'review_severity_level': getattr(user, 'review_severity_level', 'standard')
             }
             ai_analyzer = AICodeAnalyzer(ai_config)
@@ -1115,6 +1124,10 @@ class ReviewService:
 
         return self.db.update_issue(issue_id, message, suggestion, comment_text)
 
+    def restore_comment(self, issue_id: int) -> bool:
+        """恢复被拒绝的评论"""
+        return self.db.restore_comment(issue_id)
+
     def bulk_confirm_comments(self, review_id: int, issue_ids: List[int]) -> Dict:
         """批量确认评论"""
         try:
@@ -1740,3 +1753,55 @@ class ReviewService:
             raise
 
         return analyzed_files, all_issues, issue_records
+
+    def cleanup(self):
+        """清理服务资源"""
+        try:
+            self.logger.info("Cleaning up ReviewService resources...")
+
+            # 清理Agent编排系统
+            if self.agent_orchestrator and hasattr(self.agent_orchestrator, 'shutdown'):
+                try:
+                    self.agent_orchestrator.shutdown()
+                except Exception as e:
+                    self.logger.error(f"Error shutting down agent orchestrator: {e}")
+
+            if self.resource_manager and hasattr(self.resource_manager, 'shutdown'):
+                try:
+                    self.resource_manager.shutdown()
+                except Exception as e:
+                    self.logger.error(f"Error shutting down resource manager: {e}")
+
+            if self.task_scheduler and hasattr(self.task_scheduler, 'shutdown'):
+                try:
+                    self.task_scheduler.shutdown()
+                except Exception as e:
+                    self.logger.error(f"Error shutting down task scheduler: {e}")
+
+            # 清理数据库连接
+            try:
+                if hasattr(self.db, 'cleanup'):
+                    self.db.cleanup()
+                if hasattr(self.auth_db, 'cleanup'):
+                    self.auth_db.cleanup()
+            except Exception as e:
+                self.logger.error(f"Error cleaning up database connections: {e}")
+
+            # 清理进度存储
+            with self._progress_lock:
+                self._progress_storage.clear()
+
+            with self._cancellation_lock:
+                self._cancellation_flags.clear()
+
+            self.logger.info("ReviewService resources cleaned up successfully")
+
+        except Exception as e:
+            self.logger.error(f"Error during cleanup: {e}")
+
+    def __del__(self):
+        """析构函数，确保资源被释放"""
+        try:
+            self.cleanup()
+        except:
+            pass

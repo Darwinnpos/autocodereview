@@ -207,29 +207,39 @@
                                                 <div class="form-check">
                                                     <input class="form-check-input" type="radio" name="reviewMode" id="serialMode" value="serial" checked>
                                                     <label class="form-check-label" for="serialMode">
-                                                        <strong>串行模式</strong> <span class="badge bg-info small">默认</span>
+                                                        <strong>串行模式</strong> <span class="badge bg-info small">推荐</span>
                                                     </label>
                                                 </div>
                                                 <small class="text-muted d-block mt-2">
                                                     逐个文件依次审查<br>
-                                                    资源占用低，适合稳定场景
+                                                    资源占用低，稳定可靠
                                                 </small>
                                             </div>
                                         </div>
                                     </div>
                                     <div class="col-md-6">
                                         <div class="card border-primary h-100">
-                                            <div class="card-body text-center p-3">
-                                                <div class="form-check">
+                                            <div class="card-body p-3">
+                                                <div class="form-check text-center">
                                                     <input class="form-check-input" type="radio" name="reviewMode" id="parallelMode" value="parallel">
                                                     <label class="form-check-label" for="parallelMode">
                                                         <strong>并行模式</strong> <span class="badge bg-warning small">实验性</span>
                                                     </label>
                                                 </div>
-                                                <small class="text-muted d-block mt-2">
+                                                <small class="text-muted d-block mt-2 text-center">
                                                     多个文件同时审查<br>
                                                     速度更快，资源占用较高
                                                 </small>
+                                                <div class="mt-3" id="parallelSettings" style="display: none;">
+                                                    <label for="maxParallelTasks" class="form-label small">
+                                                        <i class="bi bi-cpu"></i> 并行任务数
+                                                    </label>
+                                                    <input type="number" class="form-control form-control-sm"
+                                                           id="maxParallelTasks"
+                                                           min="1" max="10" value="3"
+                                                           placeholder="1-10">
+                                                    <div class="form-text">建议: 2-5个任务</div>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -359,6 +369,13 @@
 
                     <!-- AI 配置选项卡 -->
                     <div class="tab-pane fade" id="ai-pane" role="tabpanel">
+                        <!-- 全局配置提示（当启用时显示） -->
+                        <div class="alert alert-warning" id="globalConfigAlert" style="display: none;">
+                            <i class="bi bi-shield-lock"></i>
+                            <strong>管理员已启用全局AI配置</strong>
+                            <p class="mb-0 mt-2">当前系统使用管理员统一配置的 AI 服务，个人 AI 配置已被禁用。如需使用个人配置，请联系管理员关闭全局配置。</p>
+                        </div>
+
                         <form id="aiForm">
                             <div class="mb-3">
                                 <label for="aiApiUrl" class="form-label">AI API URL</label>
@@ -378,17 +395,11 @@
                                 <div class="col-md-4">
                                     <div class="mb-3">
                                         <label for="aiModel" class="form-label">AI 模型</label>
-                                        <div class="input-group">
-                                            <select class="form-select" id="aiModel">
-                                                <option value="">请先探测可用模型</option>
-                                            </select>
-                                            <button type="button" class="btn btn-outline-secondary" id="detectModelsBtn">
-                                                <i class="bi bi-search"></i>
-                                                探测
-                                            </button>
-                                        </div>
+                                        <select class="form-select" id="aiModel">
+                                            <option value="">请填写API信息以自动探测</option>
+                                        </select>
                                         <div class="form-text">
-                                            <small id="modelDetectionStatus" class="text-muted"></small>
+                                            <small id="modelDetectionStatus" class="text-muted">修改API URL或密钥将自动探测可用模型</small>
                                         </div>
                                     </div>
                                 </div>
@@ -445,6 +456,7 @@ let userProfile = null;
 // 页面加载时获取用户资料
 document.addEventListener('DOMContentLoaded', function() {
     loadUserProfile();
+    checkGlobalConfig();
 });
 
 async function loadUserProfile() {
@@ -514,6 +526,9 @@ function populateProfile(user) {
         modeRadio.checked = true;
     }
 
+    // 显示/隐藏并行设置
+    toggleParallelSettings(reviewMode === 'parallel');
+
     if (user.review_config) {
         try {
             const reviewConfig = typeof user.review_config === 'string'
@@ -537,6 +552,10 @@ function populateProfile(user) {
             document.getElementById('checkMaintainability').checked = reviewConfig.check_maintainability || false;
             document.getElementById('checkComplexity').checked = reviewConfig.check_complexity || false;
             document.getElementById('checkReusability').checked = reviewConfig.check_reusability || false;
+
+            // 并行任务数
+            const maxParallelTasks = reviewConfig.max_parallel_tasks || 3;
+            document.getElementById('maxParallelTasks').value = maxParallelTasks;
 
             // 更新全选状态
             updateSelectAllState();
@@ -684,7 +703,9 @@ document.getElementById('reviewForm').addEventListener('submit', async function(
             check_tests: document.getElementById('checkTests').checked,
             check_maintainability: document.getElementById('checkMaintainability').checked,
             check_complexity: document.getElementById('checkComplexity').checked,
-            check_reusability: document.getElementById('checkReusability').checked
+            check_reusability: document.getElementById('checkReusability').checked,
+            // 并行任务数
+            max_parallel_tasks: parseInt(document.getElementById('maxParallelTasks').value) || 3
         };
 
         // 获取严重程度等级
@@ -774,50 +795,62 @@ function updateSelectAllState() {
     }
 }
 
-// 探测AI模型
-document.getElementById('detectModelsBtn').addEventListener('click', async function() {
+// 自动探测AI模型
+let detectModelsTimeout = null;
+
+async function autoDetectModels() {
     const aiApiUrl = document.getElementById('aiApiUrl').value.trim();
     const aiApiKey = document.getElementById('aiApiKey').value.trim();
-    const btn = this;
-    const statusElement = document.getElementById('modelDetectionStatus');
     const modelSelect = document.getElementById('aiModel');
+    const statusElement = document.getElementById('modelDetectionStatus');
 
+    // 如果URL为空，不进行探测
     if (!aiApiUrl) {
-        showAlert('warning', '请先填写AI API URL');
+        modelSelect.innerHTML = '<option value="">请填写API信息以自动探测</option>';
+        statusElement.textContent = '修改API URL或密钥将自动探测可用模型';
+        statusElement.className = 'text-muted';
         return;
     }
 
     // 检查密钥：如果是"已设置"占位符且userProfile中有密钥，使用保存的密钥
     let effectiveApiKey = aiApiKey;
     if ((!aiApiKey || aiApiKey === '已设置') && userProfile && userProfile.ai_api_key && userProfile.ai_api_key !== '已设置') {
-        // 提示用户我们将使用保存的密钥
-        showAlert('info', '使用已保存的API密钥进行模型探测');
         effectiveApiKey = 'saved'; // 标记使用保存的密钥，后端会处理
     }
 
     if (!effectiveApiKey) {
-        showAlert('warning', '请先填写AI API密钥');
+        modelSelect.innerHTML = '<option value="">请填写API密钥</option>';
+        statusElement.textContent = '请填写API密钥';
+        statusElement.className = 'text-muted';
         return;
     }
 
-    const originalText = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span>';
     statusElement.textContent = '正在探测可用模型...';
+    statusElement.className = 'text-info';
 
     try {
         // 使用后端API来处理模型探测，这样可以使用保存的密钥
         const response = await axios.post('/api/detect-models', {
             ai_api_url: aiApiUrl,
-            ai_api_key: effectiveApiKey === 'saved' ? null : effectiveApiKey, // null表示使用保存的密钥
+            ai_api_key: effectiveApiKey === 'saved' ? null : effectiveApiKey,
             use_saved_key: effectiveApiKey === 'saved'
         });
 
         if (response.data.success) {
             const models = response.data.data.models || [];
 
+            if (models.length === 0) {
+                modelSelect.innerHTML = '<option value="">未探测到可用模型</option>';
+                statusElement.textContent = '未探测到可用模型';
+                statusElement.className = 'text-warning';
+                return;
+            }
+
+            // 保存当前选中的模型
+            const currentModel = modelSelect.value;
+
             // 清空现有选项
-            modelSelect.innerHTML = '<option value="">请选择模型</option>';
+            modelSelect.innerHTML = '';
 
             // 添加探测到的模型
             models.forEach(model => {
@@ -827,28 +860,50 @@ document.getElementById('detectModelsBtn').addEventListener('click', async funct
                 modelSelect.appendChild(option);
             });
 
-            // 如果有当前保存的模型，确保它仍然在列表中被选中
-            if (userProfile && userProfile.ai_model) {
+            // 选择模型的优先级：
+            // 1. 如果之前有选中的模型且在新列表中，保持选中
+            // 2. 否则如果用户配置中有模型且在新列表中，选中它
+            // 3. 否则自动选择第一个模型
+            if (currentModel && models.some(m => m.id === currentModel)) {
+                modelSelect.value = currentModel;
+            } else if (userProfile && userProfile.ai_model && models.some(m => m.id === userProfile.ai_model)) {
                 modelSelect.value = userProfile.ai_model;
+            } else {
+                // 自动选择第一个模型
+                modelSelect.value = models[0].id;
             }
 
-            statusElement.textContent = `探测到 ${models.length} 个可用模型`;
+            statusElement.textContent = `探测到 ${models.length} 个可用模型，已选择: ${modelSelect.value}`;
             statusElement.className = 'text-success';
-            showAlert('success', `成功探测到 ${models.length} 个可用模型`);
         } else {
+            modelSelect.innerHTML = '<option value="">探测失败</option>';
             statusElement.textContent = '模型探测失败';
             statusElement.className = 'text-danger';
-            showAlert('danger', `模型探测失败: ${response.data.error}`);
         }
     } catch (error) {
+        modelSelect.innerHTML = '<option value="">连接失败</option>';
         statusElement.textContent = '连接失败';
         statusElement.className = 'text-danger';
-        const errorMsg = error.response?.data?.error || error.message;
-        showAlert('danger', `连接失败: ${errorMsg}`);
-    } finally {
-        btn.disabled = false;
-        btn.innerHTML = originalText;
+        console.error('Auto-detect models error:', error);
     }
+}
+
+// 监听 AI API URL 变化
+document.getElementById('aiApiUrl').addEventListener('input', function() {
+    // 使用防抖，避免频繁请求
+    clearTimeout(detectModelsTimeout);
+    detectModelsTimeout = setTimeout(() => {
+        autoDetectModels();
+    }, 800); // 800ms 延迟
+});
+
+// 监听 AI API Key 变化
+document.getElementById('aiApiKey').addEventListener('input', function() {
+    // 使用防抖，避免频繁请求
+    clearTimeout(detectModelsTimeout);
+    detectModelsTimeout = setTimeout(() => {
+        autoDetectModels();
+    }, 800); // 800ms 延迟
 });
 
 // 测试AI连接
@@ -929,8 +984,17 @@ document.getElementById('testConnectionBtn').addEventListener('click', async fun
     const accessToken = document.getElementById('accessToken').value.trim();
     const btn = this;
 
-    if (!gitlabUrl || !accessToken) {
-        showAlert('warning', '请先填写GitLab URL和访问令牌');
+    if (!gitlabUrl) {
+        showAlert('warning', '请先填写GitLab URL');
+        return;
+    }
+
+    // 检查访问令牌：如果字段为空且placeholder显示"已设置"，说明之前已保存过配置
+    const accessTokenField = document.getElementById('accessToken');
+    const hasExistingToken = accessTokenField.placeholder.includes('已设置');
+
+    if (!accessToken && !hasExistingToken) {
+        showAlert('warning', '请先填写访问令牌');
         return;
     }
 
@@ -939,22 +1003,39 @@ document.getElementById('testConnectionBtn').addEventListener('click', async fun
     btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> 测试中...';
 
     try {
-        const response = await fetch(`${gitlabUrl}/api/v4/user`, {
-            headers: {
-                'Authorization': `Bearer ${accessToken}`
-            }
+        // 使用后端API进行测试，避免CORS问题
+        const response = await axios.post('/api/test-gitlab-connection', {
+            gitlab_url: gitlabUrl,
+            access_token: accessToken || null  // 如果为空，后端会使用已保存的token
         });
 
-        if (response.ok) {
+        if (response.data.success) {
             showAlert('success', 'GitLab连接测试成功！');
         } else {
-            showAlert('danger', `GitLab连接失败: ${response.status}`);
+            showAlert('danger', `GitLab连接失败: ${response.data.error || '未知错误'}`);
         }
     } catch (error) {
-        showAlert('danger', `连接测试失败: ${error.message}`);
+        const errorMsg = error.response?.data?.error || error.message;
+        showAlert('danger', `连接测试失败: ${errorMsg}`);
     } finally {
         btn.disabled = false;
         btn.innerHTML = originalText;
+    }
+});
+
+// 控制并行设置显示/隐藏
+function toggleParallelSettings(show) {
+    const parallelSettings = document.getElementById('parallelSettings');
+    if (parallelSettings) {
+        parallelSettings.style.display = show ? 'block' : 'none';
+    }
+}
+
+// 监听审查模式变化
+document.addEventListener('change', function(e) {
+    if (e.target.name === 'reviewMode') {
+        const isParallel = e.target.value === 'parallel';
+        toggleParallelSettings(isParallel);
     }
 });
 
@@ -970,6 +1051,37 @@ function showAlert(type, message) {
 
     // 自动滚动到提示框
     alertContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+// 检查全局配置状态
+async function checkGlobalConfig() {
+    try {
+        const response = await axios.get('/api/auth/global-config-status');
+        if (response.data.success && response.data.global_enabled) {
+            // 显示全局配置提示
+            document.getElementById('globalConfigAlert').style.display = 'block';
+
+            // 禁用AI配置表单的所有输入
+            const aiForm = document.getElementById('aiForm');
+            const inputs = aiForm.querySelectorAll('input, select, button');
+            inputs.forEach(input => {
+                input.disabled = true;
+                input.classList.add('bg-light');
+            });
+
+            // 如果有全局配置，显示全局配置的值
+            if (response.data.global_config) {
+                document.getElementById('aiApiUrl').value = response.data.global_config.ai_api_url || '';
+                document.getElementById('aiApiKey').value = '••••••••••••••••'; // 不显示真实密钥
+
+                const aiModelSelect = document.getElementById('aiModel');
+                aiModelSelect.innerHTML = `<option value="${response.data.global_config.ai_model}">${response.data.global_config.ai_model}</option>`;
+            }
+        }
+    } catch (error) {
+        // 静默失败，不影响页面加载
+        console.error('检查全局配置失败:', error);
+    }
 }
 </script>
 {% endblock %}

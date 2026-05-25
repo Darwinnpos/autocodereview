@@ -94,6 +94,46 @@
                 <div id="resultContent"></div>
             </div>
         </div>
+
+        <!-- 实时日志对话框 -->
+        <div id="logCard" class="card mt-4" style="display: none;">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-terminal"></i>
+                    审查日志
+                </h5>
+                <div class="btn-group btn-group-sm" role="group">
+                    <button type="button" class="btn btn-outline-secondary" id="clearLogBtn" title="清除日志">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" id="toggleAutoScrollBtn" title="自动滚动">
+                        <i class="bi bi-arrows-expand"></i>
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" id="downloadLogBtn" title="下载日志">
+                        <i class="bi bi-download"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div id="logConsole" class="log-console">
+                    <div id="logContent"></div>
+                </div>
+            </div>
+            <div class="card-footer">
+                <div class="d-flex align-items-center justify-content-between">
+                    <small class="text-muted">
+                        <i class="bi bi-clock"></i>
+                        <span id="logTimestamp">--:--:--</span>
+                        <span class="ms-3">|</span>
+                        <span class="ms-3">共 <span id="logLineCount">0</span> 行</span>
+                    </small>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="autoScrollSwitch" checked>
+                        <label class="form-check-label small" for="autoScrollSwitch">自动滚动</label>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div class="col-lg-4">
@@ -182,6 +222,12 @@ document.getElementById('reviewForm').addEventListener('submit', async function(
     const resultCard = document.getElementById('resultCard');
     const resultContent = document.getElementById('resultContent');
 
+    // 显示日志卡片并添加初始日志
+    LogManager.show();
+    LogManager.clearLog();
+    LogManager.addLog('开始代码审查流程', 'info');
+    LogManager.addLog(`MR URL: ${mrUrl}`, 'debug');
+
     // 显示加载状态
     submitBtn.disabled = true;
     submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> 启动中...';
@@ -205,9 +251,15 @@ document.getElementById('reviewForm').addEventListener('submit', async function(
             const reviewId = response.data.review_id;
             console.log('Starting progress polling for review ID:', reviewId);
 
+            LogManager.addLog(`审查已启动，ID: ${reviewId}`, 'success');
+
             if (reviewId) {
                 // 保存当前审查ID用于取消功能
                 currentReviewIdForCancel = reviewId;
+
+                // 保存到 localStorage 以便页面刷新后恢复
+                localStorage.setItem('activeReviewId', reviewId);
+                localStorage.setItem('activeReviewMrUrl', mrUrl);
 
                 // 锁定页面，防止用户意外离开
                 lockPage(
@@ -239,6 +291,7 @@ document.getElementById('reviewForm').addEventListener('submit', async function(
         progressCard.style.display = 'none';
 
         const errorMessage = error.response?.data?.error || error.message;
+        LogManager.addLog(`审查启动失败: ${errorMessage}`, 'error');
         let errorIcon = 'bi-exclamation-triangle';
         let errorTitle = '审查失败';
         let errorSuggestion = '';
@@ -335,6 +388,16 @@ function startProgressPolling(reviewId) {
                     // 解锁页面
                     unlockPage();
 
+                    // 隐藏取消按钮（审查已结束）
+                    const cancelBtn = document.getElementById('cancelReviewBtn');
+                    if (cancelBtn) {
+                        cancelBtn.style.display = 'none';
+                    }
+
+                    // 清除 localStorage 中的审查状态
+                    localStorage.removeItem('activeReviewId');
+                    localStorage.removeItem('activeReviewMrUrl');
+
                     if (progress.status === 'cancelled') {
                         // 处理取消状态
                         handleCancelledReview();
@@ -385,6 +448,14 @@ function updateProgressCounts(progress) {
     };
     const statusText = statusTexts[progress.status] || progress.status;
     document.getElementById('progressStatus').textContent = statusText;
+
+    // 更新当前正在处理的文件（使用旋转图标，不刷日志）
+    if (progress.current_file && progress.status === 'analyzing') {
+        LogManager.updateCurrentTask(`正在分析: ${progress.current_file}`);
+    } else {
+        // 状态改变时，清除当前任务
+        LogManager.clearCurrentTask();
+    }
 
     // 更新进度条
     let percentage = 0;
@@ -520,6 +591,10 @@ async function showFinalResult(reviewId) {
         if (response.data.success) {
             const data = response.data.data;
 
+            // 添加完成日志
+            LogManager.addLog(`审查完成! 分析了 ${data.analysis_summary.total_files_analyzed} 个文件`, 'success');
+            LogManager.addLog(`发现 ${data.analysis_summary.total_issues_found} 个问题`, 'info');
+
             // 隐藏进度卡片，显示结果
             progressCard.style.display = 'none';
 
@@ -583,6 +658,7 @@ async function showFinalResult(reviewId) {
         progressCard.style.display = 'none';
 
         const errorMessage = error.response?.data?.error || error.message;
+        LogManager.addLog(`获取审查结果失败: ${errorMessage}`, 'error');
         let errorIcon = 'bi-exclamation-triangle';
         let errorTitle = '获取结果失败';
         let errorSuggestion = '';
@@ -769,18 +845,23 @@ function generateCommentHtml(comment, reviewId) {
                         </span>
                     </label>
                 </div>
-                <div class="btn-group" role="group">
-                    <button type="button" class="btn btn-success btn-sm" onclick="confirmSingleComment(${reviewId}, ${comment.id})">
-                        <i class="bi bi-check"></i>
-                        确认
+                <div>
+                    <button type="button" class="btn btn-outline-secondary btn-sm me-2" onclick="toggleCommentBody(${comment.id})">
+                        <i class="bi bi-chevron-up" id="toggle-icon-${comment.id}"></i>
                     </button>
-                    <button type="button" class="btn btn-danger btn-sm" onclick="rejectSingleComment(${reviewId}, ${comment.id})">
-                        <i class="bi bi-x"></i>
-                        拒绝
-                    </button>
+                    <div class="btn-group" role="group">
+                        <button type="button" class="btn btn-success btn-sm" onclick="confirmSingleComment(${reviewId}, ${comment.id})">
+                            <i class="bi bi-check"></i>
+                            确认
+                        </button>
+                        <button type="button" class="btn btn-danger btn-sm" onclick="rejectSingleComment(${reviewId}, ${comment.id})">
+                            <i class="bi bi-x"></i>
+                            拒绝
+                        </button>
+                    </div>
                 </div>
             </div>
-            <div class="card-body">
+            <div class="card-body" id="card-body-${comment.id}">
                 <!-- 代码上下文容器 - 默认显示 -->
                 <div class="code-context-container mb-3" id="context-${comment.id}">
                     <div class="text-center p-3 border rounded bg-light">
@@ -976,17 +1057,125 @@ async function rejectSingleComment(reviewId, issueId) {
     try {
         const response = await axios.post(`/api/review/${reviewId}/reject-comment/${issueId}`);
         if (response.data.success) {
-            // 移除该评论卡片
+            // 更新缓存数组中的评论状态
+            const comment = currentComments.find(c => c.id === issueId);
+            if (comment) {
+                comment.comment_status = 'rejected';
+            }
+
+            // 折叠该评论卡片而不是删除
             const card = document.querySelector(`[data-issue-id="${issueId}"]`);
             if (card) {
-                card.remove();
+                // 添加折叠样式
+                card.classList.add('rejected-comment');
+
+                // 隐藏卡片主体,只保留标题
+                const cardBody = card.querySelector('.card-body');
+                if (cardBody) {
+                    cardBody.style.display = 'none';
+                }
+
+                // 更新切换按钮图标为向下（因为已折叠）
+                const toggleIcon = document.getElementById(`toggle-icon-${issueId}`);
+                if (toggleIcon) {
+                    toggleIcon.classList.remove('bi-chevron-up');
+                    toggleIcon.classList.add('bi-chevron-down');
+                }
+
+                // 找到按钮容器并替换内容
+                const cardHeader = card.querySelector('.card-header');
+                const buttonContainer = cardHeader?.querySelector('div:last-child');
+                if (buttonContainer) {
+                    // 添加已拒绝标签到label中
+                    const label = cardHeader.querySelector('.form-check-label');
+                    if (label && !label.querySelector('.rejected-badge')) {
+                        const rejectedBadge = document.createElement('span');
+                        rejectedBadge.className = 'badge bg-secondary ms-2 rejected-badge';
+                        rejectedBadge.innerHTML = '<i class="bi bi-x-circle"></i> 已拒绝';
+                        label.appendChild(rejectedBadge);
+                    }
+
+                    // 替换按钮容器内容
+                    buttonContainer.innerHTML = `
+                        <button type="button" class="btn btn-outline-secondary btn-sm me-2" onclick="toggleCommentBody(${issueId})">
+                            <i class="bi bi-chevron-down" id="toggle-icon-${issueId}"></i>
+                        </button>
+                        <button type="button" class="btn btn-warning btn-sm restore-btn" onclick="restoreRejectedComment(${reviewId}, ${issueId})">
+                            <i class="bi bi-arrow-counterclockwise"></i> 恢复
+                        </button>
+                    `;
+                }
             }
-            showToast('success', '评论已拒绝');
+            showToast('success', '评论已拒绝（已折叠）');
         } else {
             showToast('error', '拒绝评论失败');
         }
     } catch (error) {
         showToast('error', '拒绝评论失败: ' + (error.response?.data?.error || error.message));
+    }
+}
+
+async function restoreRejectedComment(reviewId, issueId) {
+    try {
+        const response = await axios.post(`/api/review/${reviewId}/restore-comment/${issueId}`);
+        if (response.data.success) {
+            // 更新缓存数组中的评论状态
+            const comment = currentComments.find(c => c.id === issueId);
+            if (comment) {
+                comment.comment_status = 'pending';
+            }
+
+            // 恢复评论卡片的正常状态
+            const card = document.querySelector(`[data-issue-id="${issueId}"]`);
+            if (card) {
+                // 移除折叠样式
+                card.classList.remove('rejected-comment');
+
+                // 显示卡片主体
+                const cardBody = card.querySelector('.card-body');
+                if (cardBody) {
+                    cardBody.style.display = 'block';
+                }
+
+                // 更新切换按钮图标为向上（因为已展开）
+                const toggleIcon = document.getElementById(`toggle-icon-${issueId}`);
+                if (toggleIcon) {
+                    toggleIcon.classList.remove('bi-chevron-down');
+                    toggleIcon.classList.add('bi-chevron-up');
+                }
+
+                // 找到按钮容器并恢复原始按钮
+                const cardHeader = card.querySelector('.card-header');
+                const buttonContainer = cardHeader?.querySelector('div:last-child');
+                if (buttonContainer) {
+                    // 移除已拒绝标签
+                    const rejectedBadge = cardHeader.querySelector('.rejected-badge');
+                    if (rejectedBadge) rejectedBadge.remove();
+
+                    // 恢复按钮容器内容
+                    buttonContainer.innerHTML = `
+                        <button type="button" class="btn btn-outline-secondary btn-sm me-2" onclick="toggleCommentBody(${issueId})">
+                            <i class="bi bi-chevron-up" id="toggle-icon-${issueId}"></i>
+                        </button>
+                        <div class="btn-group" role="group">
+                            <button type="button" class="btn btn-success btn-sm" onclick="confirmSingleComment(${reviewId}, ${issueId})">
+                                <i class="bi bi-check"></i>
+                                确认
+                            </button>
+                            <button type="button" class="btn btn-danger btn-sm" onclick="rejectSingleComment(${reviewId}, ${issueId})">
+                                <i class="bi bi-x"></i>
+                                拒绝
+                            </button>
+                        </div>
+                    `;
+                }
+            }
+            showToast('success', '评论已恢复');
+        } else {
+            showToast('error', '恢复评论失败');
+        }
+    } catch (error) {
+        showToast('error', '恢复评论失败: ' + (error.response?.data?.error || error.message));
     }
 }
 
@@ -1196,11 +1385,34 @@ function escapeHtml(text) {
         .replace(/'/g, "&#39;");
 }
 
+// 切换评论详情展开/收起
+function toggleCommentBody(commentId) {
+    const cardBody = document.getElementById(`card-body-${commentId}`);
+    const toggleIcon = document.getElementById(`toggle-icon-${commentId}`);
+
+    if (cardBody && toggleIcon) {
+        if (cardBody.style.display === 'none') {
+            // 展开
+            cardBody.style.display = 'block';
+            toggleIcon.classList.remove('bi-chevron-down');
+            toggleIcon.classList.add('bi-chevron-up');
+        } else {
+            // 收起
+            cardBody.style.display = 'none';
+            toggleIcon.classList.remove('bi-chevron-up');
+            toggleIcon.classList.add('bi-chevron-down');
+        }
+    }
+}
+
 function handleCancelledReview() {
     const submitBtn = document.querySelector('button[type="submit"]');
     const progressCard = document.getElementById('progressCard');
     const resultCard = document.getElementById('resultCard');
     const resultContent = document.getElementById('resultContent');
+
+    // 添加取消日志
+    LogManager.addLog('审查已被取消', 'warning');
 
     // 隐藏进度卡片
     progressCard.style.display = 'none';
@@ -1254,8 +1466,11 @@ document.getElementById('cancelReviewBtn').addEventListener('click', async funct
     }
 
     if (!confirm('确定要取消当前的代码审查吗？\n取消后将无法恢复已分析的数据。')) {
+        LogManager.addLog('用户取消了取消操作', 'info');
         return;
     }
+
+    LogManager.addLog('用户请求取消审查...', 'warning');
 
     const cancelBtn = this;
     const originalText = cancelBtn.innerHTML;
@@ -1268,6 +1483,8 @@ document.getElementById('cancelReviewBtn').addEventListener('click', async funct
         const response = await axios.post(`/api/review/${currentReviewIdForCancel}/cancel`);
 
         if (response.data.success) {
+            LogManager.addLog('审查已成功取消', 'success');
+
             // 停止进度轮询
             if (reviewProgressInterval) {
                 clearInterval(reviewProgressInterval);
@@ -1276,6 +1493,10 @@ document.getElementById('cancelReviewBtn').addEventListener('click', async funct
 
             // 隐藏进度卡片
             document.getElementById('progressCard').style.display = 'none';
+
+            // 清除 localStorage 中的审查状态
+            localStorage.removeItem('activeReviewId');
+            localStorage.removeItem('activeReviewMrUrl');
 
             // 显示取消结果
             const resultCard = document.getElementById('resultCard');
@@ -1307,6 +1528,7 @@ document.getElementById('cancelReviewBtn').addEventListener('click', async funct
         }
     } catch (error) {
         const errorMessage = error.response?.data?.error || error.message;
+        LogManager.addLog(`取消审查失败: ${errorMessage}`, 'error');
         showToast('error', '取消审查失败: ' + errorMessage);
     } finally {
         // 恢复取消按钮状态
@@ -1315,7 +1537,7 @@ document.getElementById('cancelReviewBtn').addEventListener('click', async funct
     }
 });
 
-// 页面加载时检查URL参数
+// 页面加载时检查URL参数和恢复审查状态
 document.addEventListener('DOMContentLoaded', function() {
     const urlParams = new URLSearchParams(window.location.search);
     const mrUrl = urlParams.get('mr_url');
@@ -1337,6 +1559,435 @@ document.addEventListener('DOMContentLoaded', function() {
         const newUrl = window.location.pathname;
         window.history.replaceState({}, '', newUrl);
     }
+
+    // 检查是否有正在进行的审查需要恢复
+    const activeReviewId = localStorage.getItem('activeReviewId');
+    const activeReviewMrUrl = localStorage.getItem('activeReviewMrUrl');
+
+    if (activeReviewId && activeReviewMrUrl) {
+        console.log('Found active review, restoring state:', activeReviewId);
+        restoreReviewState(parseInt(activeReviewId), activeReviewMrUrl);
+    }
+});
+
+// 恢复审查状态
+async function restoreReviewState(reviewId, mrUrl) {
+    try {
+        // 检查审查是否仍在进行中
+        const response = await axios.get(`/api/review/${reviewId}/progress`);
+
+        if (!response.data.success) {
+            // 审查不存在或出错，清除状态
+            localStorage.removeItem('activeReviewId');
+            localStorage.removeItem('activeReviewMrUrl');
+            return;
+        }
+
+        const progress = response.data.data;
+
+        // 如果审查已经结束，清除状态并显示结果
+        if (progress.status === 'completed' || progress.status === 'failed' || progress.status === 'cancelled') {
+            localStorage.removeItem('activeReviewId');
+            localStorage.removeItem('activeReviewMrUrl');
+
+            if (progress.status === 'completed') {
+                // 显示最终结果
+                showFinalResult(reviewId);
+            } else if (progress.status === 'cancelled') {
+                handleCancelledReview();
+            }
+            return;
+        }
+
+        // 审查仍在进行中，恢复UI状态
+        LogManager.show();
+        LogManager.clearLog();
+        LogManager.addLog('恢复审查状态...', 'info');
+        LogManager.addLog(`审查 ID: ${reviewId}`, 'debug');
+        LogManager.addLog(`MR URL: ${mrUrl}`, 'debug');
+
+        // 填充MR URL
+        document.getElementById('mrUrl').value = mrUrl;
+
+        // 显示进度卡片
+        const progressCard = document.getElementById('progressCard');
+        const resultCard = document.getElementById('resultCard');
+        const submitBtn = document.querySelector('button[type="submit"]');
+
+        resultCard.style.display = 'none';
+        progressCard.style.display = 'block';
+
+        // 禁用提交按钮
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> 审查进行中...';
+
+        // 设置当前审查ID
+        currentReviewIdForCancel = reviewId;
+
+        // 显示取消按钮
+        const cancelBtn = document.getElementById('cancelReviewBtn');
+        if (cancelBtn) {
+            cancelBtn.style.display = 'inline-block';
+        }
+
+        // 更新当前进度
+        updateProgressCounts(progress);
+
+        // 锁定页面
+        lockPage(
+            '代码审查正在进行中，离开页面将中断审查过程',
+            function() {
+                // 用户确认离开时的回调
+                if (reviewProgressInterval) {
+                    clearInterval(reviewProgressInterval);
+                }
+            }
+        );
+
+        // 开始轮询进度
+        startProgressPolling(reviewId);
+
+        LogManager.addLog('审查状态已恢复', 'success');
+
+    } catch (error) {
+        console.error('Failed to restore review state:', error);
+        // 恢复失败，清除状态
+        localStorage.removeItem('activeReviewId');
+        localStorage.removeItem('activeReviewMrUrl');
+        LogManager.addLog('恢复审查状态失败', 'error');
+    }
+}
+
+// ============================================
+// 日志功能
+// ============================================
+
+const LogManager = {
+    autoScroll: true,
+    lineCount: 0,
+    currentTaskElement: null, // 当前任务的DOM元素
+
+    init() {
+        this.setupEventListeners();
+    },
+
+    setupEventListeners() {
+        // 清除日志按钮
+        document.getElementById('clearLogBtn').addEventListener('click', () => {
+            this.clearLog();
+        });
+
+        // 下载日志按钮
+        document.getElementById('downloadLogBtn').addEventListener('click', () => {
+            this.downloadLog();
+        });
+
+        // 自动滚动开关
+        document.getElementById('autoScrollSwitch').addEventListener('change', (e) => {
+            this.autoScroll = e.target.checked;
+        });
+
+        // 切换自动滚动按钮
+        document.getElementById('toggleAutoScrollBtn').addEventListener('click', () => {
+            const checkbox = document.getElementById('autoScrollSwitch');
+            checkbox.checked = !checkbox.checked;
+            this.autoScroll = checkbox.checked;
+        });
+    },
+
+    show() {
+        document.getElementById('logCard').style.display = 'block';
+        this.updateTimestamp();
+    },
+
+    hide() {
+        document.getElementById('logCard').style.display = 'none';
+    },
+
+    addLog(message, level = 'info') {
+        const logContent = document.getElementById('logContent');
+        const timestamp = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+
+        // 创建日志行
+        const logLine = document.createElement('div');
+        logLine.className = `log-line log-${level}`;
+
+        // 图标映射
+        const iconMap = {
+            'info': 'bi-info-circle',
+            'success': 'bi-check-circle',
+            'warning': 'bi-exclamation-triangle',
+            'error': 'bi-x-circle',
+            'debug': 'bi-bug'
+        };
+
+        logLine.innerHTML = `
+            <span class="log-timestamp">[${timestamp}]</span>
+            <i class="bi ${iconMap[level] || 'bi-circle'}"></i>
+            <span class="log-message">${this.escapeHtml(message)}</span>
+        `;
+
+        logContent.appendChild(logLine);
+        this.lineCount++;
+
+        // 更新行数显示
+        document.getElementById('logLineCount').textContent = this.lineCount;
+        this.updateTimestamp();
+
+        // 自动滚动
+        if (this.autoScroll) {
+            const logConsole = document.getElementById('logConsole');
+            logConsole.scrollTop = logConsole.scrollHeight;
+        }
+    },
+
+    clearLog() {
+        const logContent = document.getElementById('logContent');
+        logContent.innerHTML = '';
+        this.lineCount = 0;
+        document.getElementById('logLineCount').textContent = '0';
+        this.addLog('日志已清除', 'info');
+    },
+
+    downloadLog() {
+        const logContent = document.getElementById('logContent');
+        const lines = logContent.querySelectorAll('.log-line');
+
+        let content = '='.repeat(60) + '\n';
+        content += 'AutoCodeReview 审查日志\n';
+        content += '生成时间: ' + new Date().toLocaleString('zh-CN') + '\n';
+        content += '='.repeat(60) + '\n\n';
+
+        lines.forEach(line => {
+            content += line.textContent.trim() + '\n';
+        });
+
+        // 创建下载
+        const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `review-log-${Date.now()}.txt`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        this.addLog('日志已下载', 'success');
+    },
+
+    updateTimestamp() {
+        const now = new Date();
+        document.getElementById('logTimestamp').textContent =
+            now.toLocaleTimeString('zh-CN', { hour12: false });
+    },
+
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    },
+
+    updateCurrentTask(message) {
+        // 如果当前任务元素不存在，创建它
+        if (!this.currentTaskElement) {
+            const logContent = document.getElementById('logContent');
+            const timestamp = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+
+            const logLine = document.createElement('div');
+            logLine.className = 'log-line log-info log-current-task';
+            logLine.innerHTML = `
+                <span class="log-timestamp">[${timestamp}]</span>
+                <i class="bi bi-arrow-repeat spinner-rotate"></i>
+                <span class="log-message">${this.escapeHtml(message)}</span>
+            `;
+
+            logContent.appendChild(logLine);
+            this.currentTaskElement = logLine;
+            this.lineCount++;
+            document.getElementById('logLineCount').textContent = this.lineCount;
+            this.updateTimestamp();
+        } else {
+            // 更新现有任务的消息
+            const messageSpan = this.currentTaskElement.querySelector('.log-message');
+            if (messageSpan) {
+                messageSpan.textContent = message; // textContent会自动转义
+            }
+        }
+
+        // 自动滚动
+        if (this.autoScroll) {
+            const logConsole = document.getElementById('logConsole');
+            logConsole.scrollTop = logConsole.scrollHeight;
+        }
+    },
+
+    clearCurrentTask() {
+        // 将当前任务转换为普通日志
+        if (this.currentTaskElement) {
+            this.currentTaskElement.classList.remove('log-current-task');
+            const spinner = this.currentTaskElement.querySelector('.spinner-rotate');
+            if (spinner) {
+                spinner.classList.remove('spinner-rotate');
+                spinner.classList.remove('bi-arrow-repeat');
+                spinner.classList.add('bi-check-circle');
+            }
+            this.currentTaskElement = null;
+        }
+    }
+};
+
+// 初始化日志管理器
+document.addEventListener('DOMContentLoaded', () => {
+    LogManager.init();
 });
 </script>
+
+<style>
+.log-console {
+    background-color: #1e1e1e;
+    color: #d4d4d4;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 13px;
+    max-height: 400px;
+    overflow-y: auto;
+    padding: 12px;
+    border-radius: 4px;
+}
+
+.log-line {
+    padding: 4px 0;
+    line-height: 1.5;
+    word-wrap: break-word;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.log-timestamp {
+    color: #858585;
+    font-size: 11px;
+    flex-shrink: 0;
+}
+
+.log-message {
+    flex: 1;
+}
+
+.log-line i {
+    flex-shrink: 0;
+}
+
+/* 不同级别的日志颜色 */
+.log-info {
+    color: #4ec9b0;
+}
+
+.log-info i {
+    color: #4ec9b0;
+}
+
+.log-success {
+    color: #4caf50;
+}
+
+.log-success i {
+    color: #4caf50;
+}
+
+.log-warning {
+    color: #ff9800;
+}
+
+.log-warning i {
+    color: #ff9800;
+}
+
+.log-error {
+    color: #f44336;
+}
+
+.log-error i {
+    color: #f44336;
+}
+
+.log-debug {
+    color: #9cdcfe;
+}
+
+.log-debug i {
+    color: #9cdcfe;
+}
+
+/* 滚动条样式 */
+.log-console::-webkit-scrollbar {
+    width: 8px;
+}
+
+.log-console::-webkit-scrollbar-track {
+    background: #2d2d2d;
+}
+
+.log-console::-webkit-scrollbar-thumb {
+    background: #555;
+    border-radius: 4px;
+}
+
+.log-console::-webkit-scrollbar-thumb:hover {
+    background: #777;
+}
+
+/* 日志卡片footer样式 */
+#logCard .card-footer {
+    background-color: #f8f9fa;
+    border-top: 1px solid #dee2e6;
+}
+
+/* 旋转动画 - 用于当前任务的spinner */
+@keyframes spinner-rotate {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.spinner-rotate {
+    animation: spinner-rotate 1s linear infinite;
+    display: inline-block;
+}
+
+/* 当前任务高亮 */
+.log-current-task {
+    background-color: rgba(78, 201, 176, 0.1);
+    padding: 4px 8px;
+    margin: 2px 0;
+    border-radius: 4px;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+    .log-console {
+        max-height: 300px;
+        font-size: 12px;
+    }
+
+    .log-timestamp {
+        font-size: 10px;
+    }
+}
+
+/* 被拒绝的评论样式 */
+.rejected-comment {
+    opacity: 0.6;
+    background-color: #f8f9fa;
+    border-left: 3px solid #6c757d;
+}
+
+.rejected-comment .card-header {
+    background-color: #e9ecef;
+}
+</style>
+
 {% endblock %}

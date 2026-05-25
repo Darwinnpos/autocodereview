@@ -111,11 +111,6 @@ def create_app(config_name='default'):
     def index():
         return render_template('index.html')
 
-    @app.route('/setup')
-    def setup_page():
-        """首次设置向导页面"""
-        return render_template('setup.html')
-
     @app.route('/config')
     def config_page():
         # 重定向到个人资料页面，因为配置功能已经合并

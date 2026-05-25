@@ -59,35 +59,21 @@
 // 登录页面是公开页面，立即显示
 document.body.classList.add('auth-checked');
 
-// 页面加载时检查系统状态和用户登录状态
-async function checkSystemStatus() {
+// 页面加载时检查用户是否已登录
+async function checkLoginStatus() {
     try {
-        const response = await fetch('/api/system-status');
-        const data = await response.json();
-
-        if (data.needs_setup) {
-            // 系统未初始化，跳转到设置页面
-            window.location.href = '/setup';
-            return;
-        }
-
-        // 系统已初始化，检查用户是否已登录
-        try {
-            const profileResponse = await fetch('/api/profile');
-            if (profileResponse.ok) {
-                // 用户已登录，跳转到首页
-                window.location.href = '/';
-            }
-        } catch (error) {
-            // 未登录或获取失败，继续显示登录页
+        const profileResponse = await fetch('/api/profile');
+        if (profileResponse.ok) {
+            // 用户已登录，跳转到首页
+            window.location.href = '/';
         }
     } catch (error) {
-        console.error('检查系统状态失败:', error);
+        // 未登录或获取失败，继续显示登录页
     }
 }
 
 // 在DOM加载完成后检查
-checkSystemStatus();
+checkLoginStatus();
 
 document.getElementById('loginForm').addEventListener('submit', async function(e) {
     e.preventDefault();

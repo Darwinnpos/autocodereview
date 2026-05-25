@@ -320,9 +320,18 @@ def update_user_status(user_id):
         elif action == 'reset_password':
             new_password = data.get('new_password')
             if not new_password:
+                logger.error(f"Reset password failed: new_password is missing")
                 return jsonify({'success': False, 'error': '缺少新密码'}), 400
+
+            logger.info(f"Attempting to reset password for user_id: {user_id}")
             success = auth_db.reset_user_password(user_id, new_password)
-            message = '密码已重置'
+            logger.info(f"Password reset result for user_id {user_id}: {success}")
+
+            if success:
+                message = '密码已重置'
+            else:
+                logger.error(f"Password reset failed for user_id {user_id}: auth_db.reset_user_password returned False")
+                return jsonify({'success': False, 'error': '重置密码失败，用户可能不存在'}), 500
         else:
             return jsonify({'success': False, 'error': '无效的操作类型'}), 400
 
@@ -332,10 +341,106 @@ def update_user_status(user_id):
             return jsonify({'success': False, 'error': '操作失败'}), 500
 
     except Exception as e:
-        print(f"Error updating user status: {e}")
+        logger.error(f"Error updating user status: {e}", exc_info=True)
         return jsonify({
             'success': False,
-            'error': '更新用户状态失败'
+            'error': f'更新用户状态失败: {str(e)}'
+        }), 500
+
+
+@admin_bp.route('/api/admin/config', methods=['GET'])
+def get_global_config():
+    """获取全局配置"""
+    try:
+        is_admin, user = require_admin()
+        if not is_admin:
+            return jsonify({'success': False, 'error': '权限不足'}), 403
+
+        configs = auth_db.get_global_config()
+
+        # 将配置转换为字典格式便于前端使用
+        config_dict = {}
+        if configs:
+            for config in configs:
+                config_dict[config['config_key']] = {
+                    'value': config['config_value'],
+                    'is_enabled': bool(config['is_enabled']),
+                    'description': config['description']
+                }
+
+        return jsonify({
+            'success': True,
+            'config': config_dict
+        })
+
+    except Exception as e:
+        logger.error(f"Error getting global config: {e}")
+        return jsonify({
+            'success': False,
+            'error': '获取全局配置失败'
+        }), 500
+
+
+@admin_bp.route('/api/admin/config', methods=['POST'])
+def update_global_config():
+    """更新全局配置"""
+    try:
+        is_admin, user = require_admin()
+        if not is_admin:
+            return jsonify({'success': False, 'error': '权限不足'}), 403
+
+        data = request.get_json()
+
+        # 更新全局AI配置启用状态
+        global_ai_enabled = data.get('global_ai_enabled', False)
+        auth_db.set_global_config(
+            'global_ai_enabled',
+            str(global_ai_enabled),
+            global_ai_enabled,
+            '启用全局AI配置',
+            user.id
+        )
+
+        # 如果启用了全局配置，保存AI配置信息
+        if global_ai_enabled:
+            ai_api_url = data.get('ai_api_url', '')
+            ai_api_key = data.get('ai_api_key', '')
+            ai_model = data.get('ai_model', '')
+
+            auth_db.set_global_config(
+                'global_ai_api_url',
+                ai_api_url,
+                True,
+                '全局AI API URL',
+                user.id
+            )
+
+            auth_db.set_global_config(
+                'global_ai_api_key',
+                ai_api_key,
+                True,
+                '全局AI API密钥',
+                user.id
+            )
+
+            auth_db.set_global_config(
+                'global_ai_model',
+                ai_model,
+                True,
+                '全局AI模型',
+                user.id
+            )
+
+        return jsonify({
+            'success': True,
+            'message': '全局配置已更新'
+        })
+
+    except Exception as e:
+        logger.error(f"Error updating global config: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': f'更新全局配置失败: {str(e)}'
         }), 500
 
 

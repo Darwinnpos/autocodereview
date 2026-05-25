@@ -14,7 +14,7 @@
 ### 1. 获取 GitLab 访问令牌
 
 **步骤一：登录 GitLab**
-1. 登录到您的 GitLab 实例（http://gitlab.hzcctech.com）
+1. 登录到您的 GitLab 实例（例如: https://gitlab.com 或您的私有GitLab地址）
 2. 点击右上角头像，选择 "Preferences"
 
 **步骤二：创建个人访问令牌**
@@ -40,7 +40,10 @@
 **GitLab URL**
 ```
 # 对于 gitlab.com
-http://gitlab.hzcctech.com
+https://gitlab.com
+
+# 或您的私有GitLab实例
+http://your-gitlab-server.com
 ```
 
 **访问令牌**
@@ -70,7 +73,10 @@ AutoCodeReview Bot
 
 ```
 # OpenWebUI 的 API 地址
-http://ai.hzcctech.com/openai
+http://your-openwebui-server.com/openai
+
+# 或使用官方 OpenAI API
+https://api.openai.com/v1
 ```
 
 **AI API 密钥**
